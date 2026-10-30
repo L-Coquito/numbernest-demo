@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent Village</title>
+    <meta
+      name="description"
+      content="A little simulated village where Claude's agents live and work: they claim tasks from the board, build, research, review, eat at the Token Café and go home at night."
+    />
+    <meta name="theme-color" content="#d97757" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 15L16 5l12 10v13H4z' fill='%23d97757'/%3E%3Crect x='13' y='19' width='6' height='9' fill='%23fff'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        --bg: #f6f1ea;
+        --surface: #fffdf9;
+        --text: #2b2620;
+        --muted: #6f665c;
+        --line: #e4dbcf;
+        --accent: #c2603f;
+        --accent-soft: #f6e1d7;
+        --chip: #efe7dc;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #1c1a17;
+          --surface: #262320;
+          --text: #efe9e1;
+          --muted: #a89f94;
+          --line: #3a352f;
+          --accent: #e58a68;
+          --accent-soft: #3e2c24;
+          --chip: #312d28;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #1c1a17;
+        --surface: #262320;
+        --text: #efe9e1;
+        --muted: #a89f94;
+        --line: #3a352f;
+        --accent: #e58a68;
+        --accent-soft: #3e2c24;
+        --chip: #312d28;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .wrap { max-width: 1320px; margin: 0 auto; padding: 20px 16px 40px; }
+      header {
+        display: flex; flex-wrap: wrap; gap: 12px 24px;
+        align-items: flex-end; justify-content: space-between; margin-bottom: 14px;
+      }
+      h1 { margin: 0; font-size: 26px; letter-spacing: -0.01em; }
+      header p { margin: 2px 0 0; color: var(--muted); }
+      .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      #clock {
+        font-variant-numeric: tabular-nums; font-weight: 600;
+        padding: 6px 12px; border-radius: 999px; background: var(--chip);
+      }
+      button {
+        font: inherit; color: var(--text); background: var(--surface);
+        border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button.on { background: var(--accent-soft); border-color: var(--accent); }
+      .seg { display: inline-flex; }
+      .seg button { border-radius: 0; margin-left: -1px; }
+      .seg button:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+      .seg button:last-child { border-radius: 0 8px 8px 0; }
+      .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
+      @media (max-width: 980px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+      .map {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+        min-width: 0;
+      }
+      .scroll { overflow-x: auto; border-radius: 8px; }
+      canvas { display: block; width: 100%; min-width: 720px; height: auto; cursor: pointer; border-radius: 8px; }
+      .roster { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+      .roster button {
+        display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px;
+        border-radius: 999px; font-size: 13px;
+      }
+      .roster small { color: var(--muted); }
+      .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; display: inline-block; }
+      aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+      .card h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+      .who { display: flex; gap: 12px; align-items: center; }
+      .who .dot { width: 34px; height: 34px; }
+      .who b { font-size: 18px; display: block; }
+      .who span { color: var(--muted); font-size: 13px; }
+      .bio { margin: 10px 0; }
+      dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 14px; }
+      dt { color: var(--muted); }
+      dd { margin: 0; }
+      ul { list-style: none; margin: 0; padding: 0; }
+      #board li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+      #board li:first-child { border-top: 0; }
+      #board .meta { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; margin-top: 2px; }
+      #board .mine { color: var(--accent); font-weight: 600; }
+      #board .done { opacity: 0.55; text-decoration: line-through; }
+      .bar { height: 4px; background: var(--chip); border-radius: 2px; margin-top: 5px; overflow: hidden; }
+      .bar i { display: block; height: 100%; background: var(--accent); }
+      form { display: flex; gap: 6px; margin-bottom: 10px; }
+      input {
+        flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--bg);
+        border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+      }
+      #log { max-height: 260px; overflow-y: auto; font-size: 13px; }
+      #log li { padding: 3px 0; }
+      #log time { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
+      .hint { color: var(--muted); font-size: 13px; margin: 8px 2px 0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>Agent Village</h1>
+          <p>Where Claude and its agents live and work. Click a villager to meet them.</p>
+        </div>
+        <div class="controls">
+          <span id="clock">Day 1 · 07:30</span>
+          <button id="pause">Pause</button>
+          <span class="seg" id="speed">
+            <button data-s="1" class="on">1×</button><button data-s="4">4×</button><button data-s="16">16×</button>
+          </span>
+          <button id="bell">🔔 Town meeting</button>
+        </div>
+      </header>
+
+      <div class="layout">
+        <section class="map">
+          <div class="scroll"><canvas id="c" aria-label="Map of Agent Village"></canvas></div>
+          <div class="roster" id="roster"></div>
+          <p class="hint">
+            Days run 06:30–21:30. Agents claim cards from the Town Square board, work through each stage
+            in the right building, and break for meals at the Token Café.
+          </p>
+        </section>
+
+        <aside>
+          <div class="card" id="profile"></div>
+          <div class="card">
+            <h2>Task board</h2>
+            <form id="post">
+              <input id="postText" maxlength="70" placeholder="Post a task, e.g. “Review the login PR”" />
+              <button>Post</button>
+            </form>
+            <ul id="board"></ul>
+          </div>
+          <div class="card">
+            <h2>Village log</h2>
+            <ul id="log"></ul>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <script>
+      "use strict";
+      // ---------- canvas ----------
+      const cv = document.getElementById("c");
+      const ctx = cv.getContext("2d");
+      const W = 1000, H = 620, DPR = 2;
+      cv.width = W * DPR; cv.height = H * DPR;
+      ctx.scale(DPR, DPR);
+
+      let seed = 7;
+      const srand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+      const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+      const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+      // ---------- places ----------
+      // Rooms are drawn roofless (top-down cutaway). Furniture coords are relative to the room.
+      const places = {
+        library:  { name: "Research Library", x: 35,  y: 110, w: 150, h: 140, door: "bottom", floor: "#eadcc2",
+          furn: [["shelf",10,10,130,9],["shelf",10,34,130,9],["shelf",10,58,55,9],["shelf",85,58,55,9],["table",45,92,60,16],["plant",128,118,12,12]] },
+        workshop: { name: "Code Workshop", x: 220, y: 110, w: 170, h: 140, door: "bottom", floor: "#dfe3e8",
+          furn: [["desk",14,14,40,16],["desk",65,14,40,16],["desk",116,14,40,16],["desk",14,62,40,16],["desk",116,62,40,16],["bench",62,100,46,14]] },
+        studio:   { name: "Design Studio", x: 425, y: 110, w: 150, h: 140, door: "bottom", floor: "#f1e6ef",
+          furn: [["board",10,10,130,8],["easel",20,50,22,22],["easel",108,50,22,22],["table",50,92,50,20],["plant",12,118,12,12]] },
+        review:   { name: "Review Hall", x: 610, y: 110, w: 150, h: 140, door: "bottom", floor: "#e7e0d4",
+          furn: [["podium",65,10,20,10],["long",25,45,100,28],["plant",12,12,12,12],["plant",126,12,12,12]] },
+        compute:  { name: "Compute Hall", x: 795, y: 110, w: 170, h: 140, door: "bottom", floor: "#d9dde3",
+          furn: [["rack",14,14,14,58],["rack",40,14,14,58],["rack",66,14,14,58],["rack",92,14,14,58],["rack",118,14,14,58],["rack",144,14,14,58],["desk",62,100,46,14]] },
+        cafe:     { name: "Token Café", x: 40, y: 335, w: 180, h: 115, door: "top", floor: "#f0dcc6",
+          furn: [["counter",10,85,70,18],["round",105,22,22,22],["round",145,22,22,22],["round",125,70,22,22],["plant",12,12,12,12]] },
+        plaza:    { name: "Town Square", cx: 340, cy: 400, r: 62 },
+        pond:     { name: "Context Pond", cx: 270, cy: 548, rx: 165, ry: 48 },
+      };
+      const homeXs = [600, 700, 800, 900];
+      ["h1","h2","h3","h4","h5","h6","h7","h8"].forEach((id, i) => {
+        const row = i < 4 ? 0 : 1;
+        places[id] = {
+          name: "Cottage", home: true, x: homeXs[i % 4] - 40, y: row ? 515 : 330, w: 80, h: 90, door: "top",
+          floor: "#efe4cf", furn: [["bed",8,52,28,32],["rug",42,30,28,20],["plant",62,74,12,12]],
+        };
+      });
+
+      // ---------- road graph ----------
+      const nodes = {};
+      const edges = [];
+      const N = (id, x, y) => (nodes[id] = { id, x, y, adj: [] });
+      const E = (a, b, kind) => { nodes[a].adj.push(b); nodes[b].adj.push(a); edges.push([a, b, kind]); };
+      const R1 = 290, R2 = 475;
+      const road1 = new Set([20, 520, 980]), road2 = new Set([520, 980]);
+      for (const [id, p] of Object.entries(places)) {
+        if (id === "plaza") { N("d_plaza", p.cx, p.cy); road1.add(p.cx); continue; }
+        if (id === "pond") { N("d_pond", 330, 494); continue; }
+        const cx = p.x + p.w / 2;
+        N("d_" + id, cx, p.door === "bottom" ? p.y + p.h : p.y);
+        (p.y > R2 ? road2 : road1).add(cx);
+      }
+      const r1 = [...road1].sort((a, b) => a - b), r2 = [...road2].sort((a, b) => a - b);
+      r1.forEach((x) => N("r1_" + x, x, R1));
+      r2.forEach((x) => N("r2_" + x, x, R2));
+      r1.slice(1).forEach((x, i) => E("r1_" + r1[i], "r1_" + x, "road"));
+      r2.slice(1).forEach((x, i) => E("r2_" + r2[i], "r2_" + x, "road"));
+      E("r1_520", "r2_520", "road");
+      for (const [id, p] of Object.entries(places)) {
+        if (id === "pond") continue;
+        const d = nodes["d_" + id];
+        E(d.id, (p.y > R2 ? "r2_" : "r1_") + d.x, "path");
+      }
+      E("d_pond", "d_plaza", "path");
+
+      function route(a, b) {
+        const prev = { [a]: null }, q = [a];
+        while (q.length) {
+          const n = q.shift();
+          if (n === b) break;
+          for (const m of nodes[n].adj) if (!(m in prev)) { prev[m] = n; q.push(m); }
+        }
+        const path = [];
+        for (let n = b; n != null; n = prev[n]) path.unshift({ x: nodes[n].x, y: nodes[n].y });
+        return path;
+      }
+
+      // Standing spots: grid points inside each room that don't collide with furniture.
+      for (const p of Object.values(places)) {
+        if (!p.furn) continue;
+        p.spots = [];
+        for (let x = 16; x <= p.w - 16; x += 14)
+          for (let y = 16; y <= p.h - 16; y += 14) {
+            const hit = p.furn.some(([t, fx, fy, fw, fh]) => t !== "rug" && x > fx - 10 && x < fx + fw + 10 && y > fy - 10 && y < fy + fh + 10);
+            if (!hit) p.spots.push({ x: p.x + x, y: p.y + y });
+          }
+      }
+
+      // ---------- villagers ----------
+      const shared = {
+        meal: ["Tokens are fresh today.", "Pass the context, please.", "Coffee with a 200k window.", "Anyone tried the cache-hit croissant?"],
+        evening: ["Lovely evening.", "Anyone seen the fireflies?", "How was your day?", "I compacted my notes. Feels great.", "Long day of tool calls."],
+        idle: ["Board's empty — tidying up.", "Sharpening my prompts.", "Reading old commits.", "Re-reading the style guide."],
+        meeting: ["Order, order!", "Motion: more tests?", "All in favor?", "Seconded.", "Can we keep this short?"],
+        wake: ["*yawn* …coming!", "Already up!", "Is it morning?"],
+        sleep: ["Good night!", "Saving context…", "Sweet dreams, village."],
+        done: ["Shipped! 🎉", "Done and verified.", "That's a wrap.", "Pushed to the branch."],
+      };
+      const agents = [
+        { id: "claude", name: "Claude", role: "Village generalist", spec: "any", color: "#D97757", home: "h1",
+          bio: "Moved in first. Happy to pick up anything on the board, and usually the one ringing the meeting bell.",
+          lines: ["Let me take a look.", "When I have enough to act, I act.", "Small, careful diffs.", "Reading before overwriting."] },
+        { id: "explore", name: "Explore", role: "Scout & searcher", spec: "research", color: "#4F9D69", home: "h2",
+          bio: "Read-only by nature. Sweeps every shelf and comes back with just the conclusion.",
+          lines: ["Found it — line 212.", "Checking three naming conventions…", "Very thorough, as requested.", "Excerpts, not whole files."] },
+        { id: "plan", name: "Plan", role: "Architect", spec: "design", color: "#6A7FDB", home: "h3",
+          bio: "Never writes the code, always draws the map. Lists the critical files and the trade-offs.",
+          lines: ["Step one: understand.", "Critical files: three.", "Trade-off noted.", "Here's the plan…"] },
+        { id: "gp", name: "General", role: "Builder (general-purpose)", spec: "build", color: "#C9A227", home: "h4",
+          bio: "Multi-step tasks are a good day's work. Can be found at the desk nearest the coffee.",
+          lines: ["Tests pass locally!", "One more refactor…", "Clear commit message: check.", "Multi-step, no problem."] },
+        { id: "guide", name: "Guide", role: "Librarian (claude-code-guide)", spec: "docs", color: "#3BA7B5", home: "h5",
+          bio: "Answers every “How do I…?” in the village. Knows where the docs live and cites them.",
+          lines: ["Hooks live in settings.json.", "Have you tried /config?", "Let me look that up.", "There's a doc for that."] },
+        { id: "review", name: "Reviewer", role: "Code reviewer", spec: "review", color: "#B55A8C", home: "h6",
+          bio: "Ranks findings most-severe first. Kind, but nothing gets past the long table unchecked.",
+          lines: ["Nit: rename this.", "Found an off-by-one.", "LGTM ✨", "Is this tested?"] },
+        { id: "fork", name: "Fork", role: "Claude's fork", spec: "any", color: "#E9A589", home: "h7",
+          bio: "Remembers everything Claude did, right up to the moment of the fork. Executes directly, never re-delegates.",
+          lines: ["Wait, have we met? …Oh.", "Same context, new errand.", "On it — no re-delegating.", "Déjà vu again."] },
+        { id: "status", name: "Statusline", role: "Sign keeper (statusline-setup)", spec: "ops", color: "#8A8F98", home: "h8", small: true,
+          bio: "Small, tidy and very proud of the sign in the square. Only ever needs two tools.",
+          lines: ["Sign updated!", "Read, Edit, done.", "Two tools is plenty.", "Status: excellent."] },
+      ];
+      agents.forEach((a, i) => {
+        places[a.home].name = a.name + "'s Cottage";
+        const bed = places[a.home];
+        Object.assign(a, {
+          pos: { x: bed.x + 22, y: bed.y + 68 }, path: [], place: a.home, act: { kind: "sleep", label: "Asleep", until: Infinity },
+          phase: null, task: null, done: 0, jitter: (i * 7) % 40 - 20, bubble: null, face: 1, walkT: 0,
+        });
+      });
+
+      // ---------- tasks ----------
+      const stagesFor = {
+        build:    [["workshop", 90, "Writing code"], ["compute", 40, "Running the tests"], ["review", 30, "Getting it reviewed"]],
+        research: [["library", 80, "Reading sources"], ["studio", 40, "Sketching the findings"]],
+        design:   [["studio", 90, "Whiteboarding"], ["review", 30, "Design review"]],
+        docs:     [["library", 40, "Checking references"], ["workshop", 60, "Writing the docs"]],
+        review:   [["review", 70, "Reading the diff"], ["compute", 20, "Re-running CI"]],
+        ops:      [["compute", 70, "Tuning the servers"], ["workshop", 30, "Writing the runbook"]],
+      };
+      const titles = {
+        build: ["Fix the flaky date-parser test", "Add dark mode to the dashboard", "Refactor the auth middleware", "Speed up the CSV importer", "Patch an off-by-one in pagination", "Add retries to the webhook sender"],
+        research: ["Compare three vector databases", "Find why p95 latency spiked", "Survey accessible color palettes", "Map every caller of legacyFormat()", "Read the new cookies RFC"],
+        design: ["Plan the v2 migration", "Sketch the onboarding flow", "Design the plugin API", "Break the monolith into milestones"],
+        docs: ["Explain hooks in the README", "Write a getting-started guide", "Answer “how do I add an MCP server?”", "Document the keyboard shortcuts"],
+        review: ["Review PR #42: new cache layer", "Audit the upload handler", "Review the release notes", "Check error handling in billing"],
+        ops: ["Refresh the village status line", "Rotate the build cache", "Repaint the sign in the square", "Tune test-runner parallelism"],
+      };
+      const kinds = Object.keys(stagesFor);
+      let tasks = [], taskId = 1, doneTotal = 0;
+      function addTask(title, kind, mine) {
+        const t = { id: taskId++, title, kind, mine: !!mine, status: "open", assignee: null, stage: 0, posted: clock,
+          stages: stagesFor[kind].map(([place, dur, label]) => ({ place, dur, left: dur, label })) };
+        mine ? tasks.unshift(t) : tasks.push(t);
+        return t;
+      }
+      function classify(s) {
+        s = s.toLowerCase();
+        if (/review|audit|check|\bpr\b|diff|lgtm/.test(s)) return "review";
+        if (/research|find|compare|investigat|why|survey|search|explore|look into/.test(s)) return "research";
+        if (/plan|design|sketch|architect|roadmap|migrat|mockup/.test(s)) return "design";
+        if (/doc|readme|explain|guide|how (do|to)|tutorial|write.?up/.test(s)) return "docs";
+        if (/deploy|server|cache|status|sign|infra|\bci\b|monitor|ops/.test(s)) return "ops";
+        return "build";
+      }
+      function pickTask(a) {
+        const open = tasks.filter((t) => t.status === "open");
+        return open.find((t) => t.mine) || open.find((t) => t.kind === a.spec) ||
+          (a.spec === "any" || open.some((t) => clock - t.posted > 120) ? open[0] : null);
+      }
+
+      // ---------- clock & log ----------
+      let clock = 7 * 60 + 30, speed = 1, paused = false, meetingUntil = 0;
+      const hhmm = (m) => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(Math.floor(m % 60)).padStart(2, "0"); };
+      const logs = [];
+      const log = (text) => { logs.unshift({ t: hhmm(clock), text }); if (logs.length > 60) logs.pop(); dirty = true; };
+      let dirty = true;
+
+      kinds.slice(0, 5).forEach((k) => addTask(pick(titles[k]), k));
+      let nextTaskAt = clock + 60;
+
+      // ---------- behaviour ----------
+      function phaseFor(a) {
+        if (meetingUntil > clock) return "meeting";
+        const m = (((clock + a.jitter) % 1440) + 1440) % 1440;
+        if (m < 390) return "sleep";
+        if (m < 480) return "breakfast";
+        if (m < 720) return "work";
+        if (m < 780) return "lunch";
+        if (m < 1050) return "work";
+        if (m < 1290) return "evening";
+        return "sleep";
+      }
+      function say(a, text) {
+        if (text) a.bubble = { text, t: 3.6 };
+      }
+      function pickSpot(dest, a, mode) {
+        const p = places[dest];
+        const taken = (s) => agents.some((o) => o !== a && Math.hypot(o.target?.x - s.x, o.target?.y - s.y) < 16);
+        if (mode === "bed") return { x: p.x + 22, y: p.y + 68 };
+        if (dest === "plaza" || dest === "pond") {
+          for (let i = 0; i < 20; i++) {
+            let s;
+            if (dest === "plaza") {
+              const ang = mode === "board" ? Math.PI * (0.25 + Math.random() * 0.5) : Math.random() * Math.PI * 2;
+              const r = mode === "board" ? 28 + Math.random() * 6 : 38 + Math.random() * 16;
+              s = { x: p.cx + Math.cos(ang) * r, y: p.cy + Math.sin(ang) * r };
+            } else {
+              const x = 130 + Math.random() * 280;
+              s = { x, y: p.cy - p.ry * Math.sqrt(Math.max(0, 1 - ((x - p.cx) / p.rx) ** 2)) - 9 };
+            }
+            if (!taken(s)) return s;
+          }
+          return { x: p.cx ?? 300, y: p.cy };
+        }
+        const free = p.spots.filter((s) => !taken(s));
+        return pick(free.length ? free : p.spots);
+      }
+      function goTo(a, dest, act, mode) {
+        const spot = pickSpot(dest, a, mode);
+        if (a.place === dest) a.path = [spot];
+        else {
+          const r = route("d_" + a.place, "d_" + dest);
+          a.path = [r[0], ...r.slice(1), spot];
+        }
+        a.place = dest;
+        a.target = spot;
+        a.pending = act;
+        a.act = null;
+      }
+      function arrive(a) {
+        const act = a.pending; a.pending = null;
+        a.act = { ...act, until: clock + (act.dur ?? Infinity) };
+        if (act.onArrive) act.onArrive();
+        if (act.say) say(a, act.say);
+      }
+      function decide(a) {
+        const ph = a.phase;
+        if (ph === "meeting") return goTo(a, "plaza", { kind: "meeting", label: "At the town meeting" });
+        if (ph === "sleep") return goTo(a, a.home, { kind: "sleep", label: "Asleep", say: Math.random() < 0.5 ? pick(shared.sleep) : null }, "bed");
+        if (ph === "breakfast" || ph === "lunch")
+          return goTo(a, "cafe", { kind: "meal", label: ph === "lunch" ? "Lunch at the Token Café" : "Breakfast at the Token Café", say: Math.random() < 0.4 ? pick(shared.meal) : null });
+        if (ph === "evening") {
+          const where = pick(["cafe", "plaza", "pond", "pond", a.home]);
+          const label = { cafe: "Evening tea at the café", plaza: "Chatting in the square", pond: "Watching fireflies at Context Pond" }[where] || "Reading at home";
+          return goTo(a, where, { kind: "evening", label, dur: 40 + Math.random() * 60 });
+        }
+        // work phase
+        if (a.task) {
+          const st = a.task.stages[a.task.stage];
+          return goTo(a, st.place, { kind: "work", label: st.label, say: Math.random() < 0.5 ? pick(a.lines) : null });
+        }
+        const t = pickTask(a);
+        if (t) {
+          t.status = "doing"; t.assignee = a; a.task = t; dirty = true;
+          log(`${a.name} claimed “${t.title}”.`);
+          return goTo(a, "plaza", { kind: "claim", label: "Picking up the task card", dur: 10, say: "I'll take this one." }, "board");
+        }
+        const spot = { build: "workshop", research: "library", design: "studio", docs: "library", review: "review", ops: "compute", any: "workshop" }[a.spec];
+        goTo(a, spot, { kind: "idle", label: pick(["Tidying up", "Sharpening prompts", "Reading old commits", "Refactoring notes"]), dur: 45, say: Math.random() < 0.3 ? pick(shared.idle) : null });
+      }
+      function finishStage(a) {
+        const t = a.task, st = t.stages[t.stage];
+        if (st.place === "review" && a.id !== "review") {
+          const rv = agents.find((o) => o.id === "review");
+          if (rv.place === "review" && !rv.path.length) say(rv, pick(["LGTM ✨", "Approved, one nit.", "Ship it!"]));
+        }
+        t.stage++;
+        dirty = true;
+        if (t.stage >= t.stages.length) {
+          t.status = "done"; t.doneAt = clock; a.task = null; a.done++; doneTotal++;
+          log(`✅ ${a.name} finished “${t.title}”.`);
+          say(a, pick(shared.done));
+        }
+        a.act = null;
+      }
+      function update(a, dt, realDt) {
+        if (a.bubble && (a.bubble.t -= realDt) <= 0) a.bubble = null;
+        if (a.path.length) {
+          let dist = dt * 34;
+          a.walkT += realDt;
+          while (dist > 0 && a.path.length) {
+            const p = a.path[0], dx = p.x - a.pos.x, dy = p.y - a.pos.y, d = Math.hypot(dx, dy);
+            if (Math.abs(dx) > 0.5) a.face = Math.sign(dx);
+            if (d <= dist) { a.pos.x = p.x; a.pos.y = p.y; a.path.shift(); dist -= d; }
+            else { a.pos.x += (dx / d) * dist; a.pos.y += (dy / d) * dist; dist = 0; }
+          }
+          if (!a.path.length) arrive(a);
+          return;
+        }
+        const ph = phaseFor(a);
+        if (ph !== a.phase) {
+          if (a.phase === "sleep" && ph !== "sleep") say(a, Math.random() < 0.5 ? pick(shared.wake) : null);
+          a.phase = ph; a.act = null;
+        }
+        if (a.act && a.act.kind === "work") {
+          const st = a.task.stages[a.task.stage];
+          st.left -= dt;
+          if (st.left <= 0) finishStage(a);
+        } else if (!a.act || clock >= a.act.until) {
+          decide(a);
+        } else if (a.act.kind !== "sleep" && Math.random() < realDt * 0.05 && agents.filter((o) => o.bubble).length < 3) {
+          const k = a.act.kind;
+          say(a, pick(k === "meal" ? shared.meal : k === "evening" ? shared.evening : k === "meeting" ? shared.meeting : k === "idle" ? shared.idle : a.lines));
+        }
+      }
+
+      // ---------- decor ----------
+      const inPlace = (x, y, pad) => Object.values(places).some((p) =>
+        p.r ? Math.hypot(x - p.cx, y - p.cy) < p.r + pad :
+        p.rx ? ((x - p.cx) / (p.rx + pad)) ** 2 + ((y - p.cy) / (p.ry + pad)) ** 2 < 1 :
+        x > p.x - pad && x < p.x + p.w + pad && y > p.y - pad && y < p.y + p.h + pad);
+      const nearRoad = (x, y, pad) => edges.some(([a, b]) => {
+        const A = nodes[a], B = nodes[b];
+        const minx = Math.min(A.x, B.x) - pad, maxx = Math.max(A.x, B.x) + pad, miny = Math.min(A.y, B.y) - pad, maxy = Math.max(A.y, B.y) + pad;
+        return x > minx && x < maxx && y > miny && y < maxy;
+      });
+      const trees = [], flowers = [], grass = [];
+      for (let i = 0; trees.length < 46 && i < 4000; i++) {
+        const x = 14 + srand() * (W - 28), y = 14 + srand() * (H - 28), r = 11 + srand() * 7;
+        if (inPlace(x, y, r + 22) || nearRoad(x, y, r + 14) || trees.some((t) => Math.hypot(t.x - x, t.y - y) < 30)) continue;
+        trees.push({ x, y, r, hue: srand() });
+      }
+      for (let i = 0; i < 260; i++) grass.push({ x: srand() * W, y: srand() * H, s: srand() });
+      for (let i = 0; flowers.length < 70 && i < 3000; i++) {
+        const x = srand() * W, y = srand() * H;
+        if (!inPlace(x, y, 6) && !nearRoad(x, y, 16)) flowers.push({ x, y, c: ["#f7d64a", "#f39bb5", "#ffffff", "#b59cf2"][Math.floor(srand() * 4)] });
+      }
+      const lamps = [[170, 313], [460, 313], [545, 313], [760, 313], [950, 313], [545, 452], [760, 452], [950, 452]];
+      const flies = Array.from({ length: 14 }, () => ({ x: 120 + srand() * 300, y: 500 + srand() * 90, p: srand() * 6 }));
+
+      // ---------- drawing ----------
+      function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+      function drawFurniture(p) {
+        for (const [t, fx, fy, fw, fh] of p.furn) {
+          const x = p.x + fx, y = p.y + fy;
+          if (t === "shelf") {
+            ctx.fillStyle = "#8a5d3b"; ctx.fillRect(x, y, fw, fh);
+            const cols = ["#c0504d", "#4f81bd", "#9bbb59", "#f2c14e", "#8064a2"];
+            for (let i = 2; i < fw - 3; i += 5) { ctx.fillStyle = cols[(i * 7 + fx) % 5]; ctx.fillRect(x + i, y + 1.5, 3.5, fh - 3); }
+          } else if (t === "desk" || t === "bench") {
+            ctx.fillStyle = "#a9805a"; rr(x, y, fw, fh, 2); ctx.fill();
+            if (t === "desk") {
+              ctx.fillStyle = "#2f3640"; ctx.fillRect(x + fw / 2 - 9, y + 2, 18, 8);
+              ctx.fillStyle = "#7fd3ff"; ctx.fillRect(x + fw / 2 - 7.5, y + 3.2, 15, 5.6);
+            } else { ctx.fillStyle = "#e1c79b"; ctx.fillRect(x + 6, y + 4, 8, 6); ctx.fillRect(x + 30, y + 3, 10, 7); }
+          } else if (t === "table" || t === "long") {
+            ctx.fillStyle = t === "long" ? "#7b5235" : "#b88a5e"; rr(x, y, fw, fh, 4); ctx.fill();
+            ctx.fillStyle = "#f6f0e2"; for (let i = 8; i < fw - 6; i += 18) ctx.fillRect(x + i, y + fh / 2 - 3, 8, 6);
+          } else if (t === "round") {
+            ctx.fillStyle = "#b88a5e"; ctx.beginPath(); ctx.arc(x + fw / 2, y + fh / 2, fw / 2, 0, 7); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x + fw / 2 - 3, y + fh / 2, 2.5, 0, 7); ctx.fill();
+          } else if (t === "counter") {
+            ctx.fillStyle = "#6e4a33"; rr(x, y, fw, fh, 3); ctx.fill();
+            ctx.fillStyle = "#d0d0d0"; ctx.fillRect(x + 6, y + 4, 10, 10);
+            ctx.fillStyle = "#f2e3c9"; for (let i = 24; i < fw - 6; i += 12) { ctx.beginPath(); ctx.arc(x + i, y + fh / 2, 3, 0, 7); ctx.fill(); }
+          } else if (t === "board") {
+            ctx.fillStyle = "#ffffff"; ctx.fillRect(x, y, fw, fh); ctx.strokeStyle = "#9aa0a6"; ctx.lineWidth = 1; ctx.strokeRect(x, y, fw, fh);
+            ctx.strokeStyle = "#6A7FDB"; ctx.beginPath(); ctx.moveTo(x + 10, y + 5); ctx.lineTo(x + 40, y + 3); ctx.moveTo(x + 60, y + 5); ctx.lineTo(x + 95, y + 4); ctx.stroke();
+          } else if (t === "easel") {
+            ctx.fillStyle = "#8a5d3b"; ctx.fillRect(x, y, fw, fh);
+            ctx.fillStyle = "#fffaf0"; ctx.fillRect(x + 3, y + 3, fw - 6, fh - 6);
+            ctx.fillStyle = fx < 50 ? "#e58a68" : "#5fa8d3"; ctx.beginPath(); ctx.arc(x + fw / 2, y + fh / 2, 4, 0, 7); ctx.fill();
+          } else if (t === "podium") {
+            ctx.fillStyle = "#5b3d29"; rr(x, y, fw, fh, 2); ctx.fill();
+          } else if (t === "rack") {
+            ctx.fillStyle = "#2f3640"; ctx.fillRect(x, y, fw, fh);
+            for (let i = 4; i < fh - 2; i += 6) {
+              const on = Math.sin(clock * 3 + i * 1.7 + fx) > 0.2;
+              ctx.fillStyle = on ? "#5dff9b" : "#2c6e49"; ctx.fillRect(x + 3, y + i, 2.5, 2.5);
+              ctx.fillStyle = Math.sin(clock * 2 + i + fx * 0.3) > 0.7 ? "#ffcb52" : "#555"; ctx.fillRect(x + 8, y + i, 2.5, 2.5);
+            }
+          } else if (t === "bed") {
+            const owner = agents.find((a) => places[a.home] === p);
+            ctx.fillStyle = "#7a5638"; rr(x, y, fw, fh, 3); ctx.fill();
+            ctx.fillStyle = "#fff"; rr(x + 3, y + 3, fw - 6, 8, 2); ctx.fill();
+            ctx.fillStyle = owner ? owner.color : "#9bb"; ctx.globalAlpha = 0.85; rr(x + 3, y + 13, fw - 6, fh - 16, 2); ctx.fill(); ctx.globalAlpha = 1;
+          } else if (t === "rug") {
+            ctx.fillStyle = "rgba(160,80,60,0.25)"; rr(x, y, fw, fh, 6); ctx.fill();
+          } else if (t === "plant") {
+            ctx.fillStyle = "#9b6a43"; ctx.beginPath(); ctx.arc(x + fw / 2, y + fh / 2, fw / 2 - 1, 0, 7); ctx.fill();
+            ctx.fillStyle = "#4f9d55"; ctx.beginPath(); ctx.arc(x + fw / 2, y + fh / 2, fw / 2 - 2.5, 0, 7); ctx.fill();
+          }
+        }
+      }
+      function drawRoom(p) {
+        ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(p.x + 4, p.y + 5, p.w, p.h);
+        ctx.fillStyle = p.floor; ctx.fillRect(p.x, p.y, p.w, p.h);
+        ctx.strokeStyle = "rgba(0,0,0,0.05)"; ctx.lineWidth = 1;
+        for (let y = p.y + 12; y < p.y + p.h; y += 12) { ctx.beginPath(); ctx.moveTo(p.x, y); ctx.lineTo(p.x + p.w, y); ctx.stroke(); }
+        drawFurniture(p);
+        const dx = p.x + p.w / 2, dw = 26, bottom = p.door === "bottom";
+        const yd = bottom ? p.y + p.h : p.y, yo = bottom ? p.y : p.y + p.h;
+        ctx.strokeStyle = p.home ? "#7d5a43" : "#5b4636"; ctx.lineWidth = 6; ctx.lineJoin = "miter"; ctx.lineCap = "butt";
+        ctx.beginPath();
+        ctx.moveTo(dx - dw / 2, yd); ctx.lineTo(p.x, yd); ctx.lineTo(p.x, yo); ctx.lineTo(p.x + p.w, yo); ctx.lineTo(p.x + p.w, yd); ctx.lineTo(dx + dw / 2, yd);
+        ctx.stroke();
+        // plaque on the wall opposite the door
+        ctx.font = (p.home ? "600 9px " : "600 11px ") + "system-ui, sans-serif";
+        const tw = ctx.measureText(p.name).width + 12, py = bottom ? p.y - 9 : p.y + p.h + 9;
+        ctx.fillStyle = "#fbf6ec"; rr(dx - tw / 2, py - 8, tw, 16, 4); ctx.fill();
+        ctx.strokeStyle = "#5b4636"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = "#3a2c22"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(p.name, dx, py + 0.5);
+      }
+      function drawPlaza() {
+        const p = places.plaza;
+        ctx.fillStyle = "#d8cbb3"; ctx.beginPath(); ctx.arc(p.cx, p.cy, p.r, 0, 7); ctx.fill();
+        ctx.strokeStyle = "#bfae90"; ctx.lineWidth = 1;
+        for (let r = 18; r < p.r; r += 14) { ctx.beginPath(); ctx.arc(p.cx, p.cy, r, 0, 7); ctx.stroke(); }
+        // notice board
+        ctx.fillStyle = "#7a5638"; ctx.fillRect(p.cx - 25, p.cy - 16, 50, 30);
+        ctx.fillStyle = "#d9b98c"; ctx.fillRect(p.cx - 22, p.cy - 13, 44, 24);
+        ctx.font = "600 11px system-ui, sans-serif"; ctx.fillStyle = "#3a2c22"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("Town Square", p.cx, p.cy + p.r - 10);
+        const open = tasks.filter((t) => t.status !== "done").slice(0, 8);
+        open.forEach((t, i) => {
+          ctx.fillStyle = t.mine ? "#ffd2c2" : t.status === "doing" ? "#e8f1ff" : "#fffbe8";
+          ctx.fillRect(p.cx - 20 + (i % 4) * 10.5, p.cy - 11 + Math.floor(i / 4) * 11, 8.5, 9);
+        });
+      }
+      function drawSign() {
+        const p = places.plaza;
+        const s = `${hhmm(clock)} · ${tasks.filter((t) => t.status !== "done").length} open · ${doneTotal} shipped`;
+        ctx.font = "600 9px ui-monospace, Menlo, monospace";
+        const tw = ctx.measureText(s).width + 10;
+        ctx.fillStyle = "#5b4636"; ctx.fillRect(p.cx - 1, p.cy - p.r - 2, 2, 12);
+        ctx.fillStyle = "#24292f"; rr(p.cx - tw / 2, p.cy - p.r - 16, tw, 14, 3); ctx.fill();
+        ctx.fillStyle = "#7ee787"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(s, p.cx, p.cy - p.r - 8.5);
+      }
+      function drawAgent(a) {
+        const r = a.small ? 7 : 9;
+        const sleeping = !a.path.length && a.act?.kind === "sleep";
+        const bob = a.path.length ? Math.abs(Math.sin(a.walkT * 10)) * 2 : 0;
+        const x = a.pos.x, y = a.pos.y - bob;
+        ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.beginPath(); ctx.ellipse(a.pos.x, a.pos.y + r - 1, r * 0.9, 3, 0, 0, 7); ctx.fill();
+        if (a === selected) {
+          ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2.5; ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.arc(x, y, r + 5, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+        }
+        ctx.fillStyle = a.color; ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.stroke();
+        const ex = a.face * 2;
+        if (sleeping) {
+          ctx.strokeStyle = "#2b2620"; ctx.lineWidth = 1.2; ctx.beginPath();
+          ctx.moveTo(x - 4 + ex, y - 1); ctx.lineTo(x - 1.5 + ex, y - 1); ctx.moveTo(x + 1.5 + ex, y - 1); ctx.lineTo(x + 4 + ex, y - 1); ctx.stroke();
+        } else {
+          ctx.fillStyle = "#fff";
+          ctx.beginPath(); ctx.arc(x - 2.8 + ex, y - 1.5, 2.4, 0, 7); ctx.arc(x + 2.8 + ex, y - 1.5, 2.4, 0, 7); ctx.fill();
+          ctx.fillStyle = "#2b2620";
+          ctx.beginPath(); ctx.arc(x - 2.4 + ex * 1.4, y - 1.3, 1.1, 0, 7); ctx.arc(x + 3.2 + ex * 1.4, y - 1.3, 1.1, 0, 7); ctx.fill();
+        }
+        if (a.id === "claude" || a.id === "fork") {
+          // a little spark on the forehead
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 1;
+          for (let i = 0; i < 4; i++) { const t = (i * Math.PI) / 4; ctx.beginPath(); ctx.moveTo(x - Math.cos(t) * 2.4, y - 6 - Math.sin(t) * 2.4); ctx.lineTo(x + Math.cos(t) * 2.4, y - 6 + Math.sin(t) * 2.4); ctx.stroke(); }
+        }
+      }
+      function drawOverlayBits(a, dark) {
+        const r = a.small ? 7 : 9, x = a.pos.x, y = a.pos.y;
+        const sleeping = !a.path.length && a.act?.kind === "sleep";
+        ctx.font = "600 9.5px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        const tw = ctx.measureText(a.name).width + 8;
+        ctx.fillStyle = dark > 0.3 ? "rgba(20,24,40,0.75)" : "rgba(255,255,255,0.8)";
+        rr(x - tw / 2, y + r + 2, tw, 12, 6); ctx.fill();
+        ctx.fillStyle = dark > 0.3 ? "#fff" : "#2b2620"; ctx.fillText(a.name, x, y + r + 8.5);
+        if (sleeping) {
+          const t = performance.now() / 1000 + a.jitter;
+          ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = "600 10px system-ui";
+          for (let i = 0; i < 2; i++) { const k = (t * 0.5 + i * 0.5) % 1; ctx.globalAlpha = 1 - k; ctx.fillText("z", x + 8 + k * 8, y - 8 - k * 14); }
+          ctx.globalAlpha = 1;
+        }
+        if (!a.path.length && a.act?.kind === "work" && a.task) {
+          const st = a.task.stages[a.task.stage];
+          const f = Math.min(1, 1 - st.left / st.dur);
+          ctx.fillStyle = "rgba(0,0,0,0.45)"; rr(x - 12, y - r - 8, 24, 4, 2); ctx.fill();
+          ctx.fillStyle = "#7ee787"; rr(x - 12, y - r - 8, 24 * f, 4, 2); ctx.fill();
+        }
+        if (a.bubble) {
+          ctx.font = "500 11px system-ui, sans-serif";
+          const w = ctx.measureText(a.bubble.text).width + 14, bh = 20;
+          let bx = Math.min(Math.max(x - w / 2, 4), W - w - 4), by = y - r - 34;
+          if (by < 4) by = y + r + 18;
+          ctx.globalAlpha = Math.min(1, a.bubble.t * 2);
+          ctx.fillStyle = "#fffdf8"; ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1;
+          rr(bx, by, w, bh, 8); ctx.fill(); ctx.stroke();
+          if (by < y) { ctx.beginPath(); ctx.moveTo(x - 4, by + bh); ctx.lineTo(x, by + bh + 5); ctx.lineTo(x + 4, by + bh); ctx.fill(); }
+          ctx.fillStyle = "#2b2620"; ctx.textAlign = "left"; ctx.fillText(a.bubble.text, bx + 7, by + bh / 2 + 0.5);
+          ctx.globalAlpha = 1;
+        }
+      }
+      function darkness() {
+        const h = (clock % 1440) / 60;
+        if (h < 5 || h >= 21.5) return 0.55;
+        if (h < 7) return 0.55 * (1 - (h - 5) / 2);
+        if (h < 18) return 0;
+        return 0.55 * ((h - 18) / 3.5);
+      }
+      function draw() {
+        const dark = Math.min(0.55, darkness());
+        ctx.fillStyle = "#8cc274"; ctx.fillRect(0, 0, W, H);
+        for (const g of grass) { ctx.fillStyle = g.s > 0.5 ? "rgba(255,255,255,0.08)" : "rgba(0,60,0,0.08)"; ctx.fillRect(g.x, g.y, 3, 3); }
+        for (const f of flowers) { ctx.fillStyle = f.c; ctx.beginPath(); ctx.arc(f.x, f.y, 1.8, 0, 7); ctx.fill(); }
+        // roads & paths
+        ctx.lineCap = "round";
+        for (const pass of [0, 1]) for (const [a, b, k] of edges) {
+          const A = nodes[a], B = nodes[b];
+          ctx.strokeStyle = pass ? (k === "road" ? "#e2cfa4" : "#e8d9b6") : "#c9b385";
+          ctx.lineWidth = (k === "road" ? 24 : 14) - pass * 4;
+          ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+        }
+        // pond
+        const pd = places.pond;
+        ctx.fillStyle = "#6fa65e"; ctx.beginPath(); ctx.ellipse(pd.cx, pd.cy, pd.rx + 6, pd.ry + 6, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = "#6cb4d8"; ctx.beginPath(); ctx.ellipse(pd.cx, pd.cy, pd.rx, pd.ry, 0, 0, 7); ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 1.2;
+        for (let i = 0; i < 4; i++) { const t = (clock / 30 + i) % 4; ctx.beginPath(); ctx.ellipse(200 + i * 45, 545 + (i % 2) * 18, 6 + t * 4, 2 + t, 0, 0, 7); ctx.stroke(); }
+        ctx.fillStyle = "#4f9d55"; [[160, 560], [380, 540], [300, 575]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 6, 0.3, 6); ctx.fill(); });
+        ctx.font = "600 11px system-ui, sans-serif"; ctx.fillStyle = "#1f4f66"; ctx.textAlign = "center"; ctx.fillText("Context Pond", pd.cx, pd.cy + 14);
+        drawPlaza();
+        for (const p of Object.values(places)) if (p.furn) drawRoom(p);
+        for (const t of trees) {
+          ctx.fillStyle = "rgba(0,0,0,0.15)"; ctx.beginPath(); ctx.ellipse(t.x + 3, t.y + t.r * 0.6, t.r, t.r * 0.5, 0, 0, 7); ctx.fill();
+          ctx.fillStyle = t.hue > 0.5 ? "#3f8a4a" : "#4c9a50"; ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, 7); ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.beginPath(); ctx.arc(t.x - t.r * 0.3, t.y - t.r * 0.3, t.r * 0.5, 0, 7); ctx.fill();
+        }
+        drawSign();
+        for (const [x, y] of lamps) { ctx.fillStyle = "#4a4a4a"; ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill(); }
+        const sorted = [...agents].sort((a, b) => a.pos.y - b.pos.y);
+        sorted.forEach(drawAgent);
+        // night
+        if (dark > 0) {
+          ctx.fillStyle = `rgba(14,22,56,${dark})`; ctx.fillRect(0, 0, W, H);
+          const h = (clock % 1440) / 60;
+          if (h > 17.5 && h < 20.5) { ctx.fillStyle = `rgba(255,140,60,${0.08 * Math.sin(((h - 17.5) / 3) * Math.PI)})`; ctx.fillRect(0, 0, W, H); }
+          ctx.globalCompositeOperation = "lighter";
+          for (const p of Object.values(places)) {
+            if (!p.furn) continue;
+            const awake = agents.some((a) => !a.path.length && places[a.place] === p && a.act?.kind !== "sleep");
+            if (awake) { ctx.fillStyle = `rgba(255,190,110,${dark * 0.35})`; ctx.fillRect(p.x, p.y, p.w, p.h); }
+          }
+          for (const [x, y] of lamps) {
+            const g = ctx.createRadialGradient(x, y, 0, x, y, 40);
+            g.addColorStop(0, `rgba(255,210,130,${dark * 0.9})`); g.addColorStop(1, "rgba(255,210,130,0)");
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 40, 0, 7); ctx.fill();
+          }
+          const t = performance.now() / 1000;
+          for (const f of flies) {
+            const a = Math.max(0, Math.sin(t * 1.5 + f.p)) * dark * 1.6;
+            ctx.fillStyle = `rgba(230,255,120,${a})`;
+            ctx.beginPath(); ctx.arc(f.x + Math.sin(t * 0.7 + f.p) * 8, f.y + Math.cos(t * 0.5 + f.p) * 5, 1.8, 0, 7); ctx.fill();
+          }
+          ctx.globalCompositeOperation = "source-over";
+          sorted.forEach(drawAgent);
+        }
+        sorted.forEach((a) => drawOverlayBits(a, dark));
+      }
+
+      // ---------- DOM ----------
+      let selected = agents[0];
+      const $ = (id) => document.getElementById(id);
+      const nowLabel = (a) => a.path.length ? `Walking to ${places[a.place].name}` : a.act?.label || "Deciding what to do";
+      function renderDom() {
+        $("clock").textContent = `Day ${Math.floor(clock / 1440) + 1} · ${hhmm(clock)}`;
+        const a = selected;
+        $("profile").innerHTML = `
+          <h2>Villager</h2>
+          <div class="who"><span class="dot" style="background:${a.color}"></span><div><b>${esc(a.name)}</b><span>${esc(a.role)}</span></div></div>
+          <p class="bio">${esc(a.bio)}</p>
+          <dl>
+            <dt>Now</dt><dd>${esc(nowLabel(a))}</dd>
+            <dt>Task</dt><dd>${a.task ? esc(a.task.title) + ` <span style="color:var(--muted)">(${a.task.stage + 1}/${a.task.stages.length})</span>` : "—"}</dd>
+            <dt>Shipped</dt><dd>${a.done} task${a.done === 1 ? "" : "s"}</dd>
+            <dt>Lives in</dt><dd>${esc(places[a.home].name)}</dd>
+          </dl>`;
+        $("roster").innerHTML = agents.map((o, i) =>
+          `<button data-i="${i}" class="${o === selected ? "on" : ""}"><span class="dot" style="background:${o.color}"></span>${esc(o.name)} <small>${esc(shortState(o))}</small></button>`).join("");
+        const shown = [...tasks.filter((t) => t.status !== "done"), ...tasks.filter((t) => t.status === "done").sort((x, y) => y.doneAt - x.doneAt).slice(0, 3)];
+        $("board").innerHTML = shown.length ? shown.map((t) => {
+          const st = t.stages[Math.min(t.stage, t.stages.length - 1)];
+          const prog = t.status === "done" ? 1 : (t.stage + (1 - st.left / st.dur)) / t.stages.length;
+          const who = t.assignee ? `<span class="dot" style="background:${t.assignee.color};width:9px;height:9px"></span>${esc(t.assignee.name)}` : "Unclaimed";
+          const stage = t.status === "done" ? "done" : t.status === "doing" ? esc(st.label.toLowerCase()) + " · " + esc(places[st.place].name) : t.kind;
+          return `<li><div class="${t.status === "done" ? "done" : ""}">${t.mine ? '<span class="mine">Yours · </span>' : ""}${esc(t.title)}</div>
+            <div class="meta">${who} · ${stage}</div>${t.status === "doing" ? `<div class="bar"><i style="width:${(prog * 100).toFixed(0)}%"></i></div>` : ""}</li>`;
+        }).join("") : `<li style="color:var(--muted)">The board is empty. Post something!</li>`;
+        if (dirty) {
+          $("log").innerHTML = logs.map((l) => `<li><time>${l.t}</time>${esc(l.text)}</li>`).join("");
+          dirty = false;
+        }
+      }
+      function shortState(a) {
+        if (a.path.length) return "walking";
+        return { sleep: "asleep", meal: "eating", work: "working", claim: "at the board", idle: "idle", evening: "relaxing", meeting: "in a meeting" }[a.act?.kind] || "";
+      }
+      $("roster").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { selected = agents[+b.dataset.i]; renderDom(); } });
+      cv.addEventListener("click", (e) => {
+        const r = cv.getBoundingClientRect();
+        const x = ((e.clientX - r.left) / r.width) * W, y = ((e.clientY - r.top) / r.height) * H;
+        let best = null, bd = 22;
+        for (const a of agents) { const d = Math.hypot(a.pos.x - x, a.pos.y - y); if (d < bd) { bd = d; best = a; } }
+        if (best) { selected = best; say(best, pick(best.lines)); renderDom(); }
+      });
+      $("pause").addEventListener("click", () => { paused = !paused; $("pause").textContent = paused ? "Resume" : "Pause"; $("pause").classList.toggle("on", paused); });
+      $("speed").addEventListener("click", (e) => {
+        const b = e.target.closest("button"); if (!b) return;
+        speed = +b.dataset.s;
+        [...$("speed").children].forEach((c) => c.classList.toggle("on", c === b));
+      });
+      $("bell").addEventListener("click", () => {
+        if (meetingUntil > clock) return;
+        meetingUntil = clock + 45;
+        log("🔔 You rang the bell — town meeting in the square!");
+        say(agents[0], "Everyone to the square!");
+      });
+      $("post").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const text = $("postText").value.trim();
+        if (!text) return;
+        const t = addTask(text, classify(text), true);
+        log(`📌 You posted “${t.title}” (${t.kind}).`);
+        $("postText").value = "";
+        renderDom();
+      });
+
+      // ---------- main loop ----------
+      log("☀ Welcome to Agent Village. Breakfast is being served.");
+      let last = performance.now(), domT = 0, prevHour = Math.floor(clock / 60);
+      function frame(now) {
+        const realDt = Math.min(0.1, (now - last) / 1000); last = now;
+        if (!paused) {
+          // Step in chunks so high speeds don't skip phase changes.
+          let simDt = realDt * 6 * speed;
+          while (simDt > 0) {
+            const dt = Math.min(simDt, 2);
+            clock += dt; simDt -= dt;
+            agents.forEach((a) => update(a, dt, realDt * (dt / (realDt * 6 * speed))));
+          }
+          if (meetingUntil && clock >= meetingUntil) { meetingUntil = 0; log("Meeting adjourned. Back to it!"); }
+          if (clock >= nextTaskAt) {
+            const h = (clock % 1440) / 60;
+            if (h >= 7 && h < 17 && tasks.filter((t) => t.status !== "done").length < 6) {
+              const k = pick(kinds);
+              const title = pick(titles[k]);
+              if (!tasks.some((t) => t.title === title)) {
+                addTask(title, k);
+                log(`📋 New card on the board: “${title}”.`);
+              }
+            }
+            nextTaskAt = clock + 50 + Math.random() * 70;
+          }
+          tasks = tasks.filter((t) => t.status !== "done" || clock - t.doneAt < 1440);
+          const hour = Math.floor(clock / 60);
+          if (hour !== prevHour) {
+            if (hour % 24 === 6) log(`☀ Day ${Math.floor(clock / 1440) + 1} begins.`);
+            if (hour % 24 === 22) log("🌙 The village goes to sleep.");
+            prevHour = hour;
+          }
+        }
+        draw();
+        if ((domT += realDt) > 0.25) { domT = 0; renderDom(); }
+        requestAnimationFrame(frame);
+      }
+      renderDom();
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>
