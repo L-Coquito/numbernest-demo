@@ -527,15 +527,19 @@
 
       if (subject === "math" && MATH[grade]) {
         topic = MATH_TOPICS[grade];
-        // One question from each of 4 different skills, plus sometimes one of the hand-written ones.
-        const gens = shuffle(MATH[grade]).slice(0, 4);
-        questions = gens.map((g) => g());
-        const used = questions.map((x) => x.skill);
+        // Up to 10 questions: every kind of problem twice with new numbers, in a mixed order,
+        // never the same kind twice in a row. One may be swapped for a hand-written question.
+        const LEN = 10;
+        let items = [];
+        while (items.length < LEN) for (const g of shuffle(MATH[grade])) if (items.length < LEN) items.push(g());
+        const ok = (list) => list.every((x, i) => i === 0 || x.skill !== list[i - 1].skill);
+        questions = items;
+        for (let tries = 0; tries < 200 && !ok(questions); tries++) questions = shuffle(items);
         const fresh = deck.questions.filter((x) => !seenList.includes(x.id));
-        const extra = (fresh.length ? fresh : deck.questions).filter((x) => !used.includes(x.skill));
-        if (extra.length) questions.splice(rnd(0, questions.length), 0, pick(extra));
-        else questions.push(shuffle(MATH[grade]).find((g) => !gens.includes(g))());
-        seen[key] = fresh.length ? seenList.concat(questions.map((x) => x.id).filter((id) => id[0] !== "g")) : [];
+        const base = pick(fresh.length ? fresh : deck.questions);
+        const slot = questions.findIndex((x) => x.skill === base.skill);
+        questions[slot >= 0 ? slot : rnd(0, LEN - 1)] = base;
+        seen[key] = fresh.length ? seenList.concat([base.id]) : [base.id];
       } else {
         // Reading: whole passages the student hasn't seen yet, then fall back to the oldest.
         const pool = deck.questions.map((x) => Object.assign({ group: "base-" + x.passage.slice(0, 20) }, x)).concat(readingQuestions(grade));
@@ -547,10 +551,16 @@
         }
         let unseen = groups.filter((g) => !seenList.includes(g.id));
         let history = seenList;
-        if (unseen.length < 2) { unseen = groups; history = []; }
-        const chosen = shuffle(unseen).slice(0, 2);
+        if (unseen.length < 4) { unseen = groups; history = []; }
+        // Up to 10 questions from passages the student hasn't read yet.
+        const chosen = [];
         questions = [];
-        for (const g of chosen) questions.push(...g.items);
+        for (const g of shuffle(unseen)) {
+          if (questions.length + g.items.length > 10) continue;
+          chosen.push(g);
+          questions.push(...g.items);
+          if (questions.length >= 8) break;
+        }
         seen[key] = history.concat(chosen.map((g) => g.id));
       }
 

@@ -14,7 +14,8 @@ five kinds of problems per grade (for example grade 4 has multi-digit multiplica
 fractions, adding fractions, comparing fractions and division with remainders). Reading has four
 original passages per grade with two questions each, plus the original passages.
 
-Each session mixes different skills, shuffles the answer choices, and avoids passages this device
+Each session has up to 10 questions, mixes different skills (never the same kind twice in a row),
+shuffles the answer choices, and avoids passages this device
 has already seen (kept in the browser only). **New questions** at the end starts a fresh set.
 
 Everything in the demo is invented placeholder content — no real student data, no network calls,
