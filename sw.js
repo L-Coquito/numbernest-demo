@@ -1,7 +1,7 @@
 // NumberNest service worker: keeps the app working offline once it has been opened.
 // The demo is a single self-contained page, so caching these files is enough.
 // Bump CACHE when the app shell changes so installed copies pick up the new version.
-const CACHE = "numbernest-v5";
+const CACHE = "numbernest-v6";
 const SHELL = [
   "./",
   "./index.html",
