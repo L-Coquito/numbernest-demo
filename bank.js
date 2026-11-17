@@ -687,8 +687,230 @@
     }
   }
 
+  // ---------- results: the completed screen and the grown-up report ----------
+  // Results stay on this device only (browser storage). Nothing is sent anywhere.
+  const HISTORY_KEY = "numbernest-history-v1";
+  let round = { subject: "math", grade: 4, items: [], startedAt: Date.now() };
+
+  // Called by the tutor screen each time a question is finished.
+  // result: "first" (right on the first try), "helped" (right after hints or a wrong pick), "shown" (solution shown).
+  function record(question, info) {
+    if (info.index === 0 || round.subject !== info.subject || round.grade !== info.grade) {
+      round = { subject: info.subject, grade: info.grade, items: [], startedAt: Date.now() - 60000 };
+    }
+    round.items = round.items.filter((x) => x.index !== info.index);
+    round.items.push({
+      index: info.index,
+      skill: question.skill,
+      prompt: question.prompt,
+      answer: question.choices[question.answerIndex],
+      wrong: info.wrong || [],
+      hints: info.hints || 0,
+      result: info.result,
+    });
+  }
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveRound(summary) {
+    try {
+      const list = loadHistory();
+      list.unshift(summary);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 30)));
+    } catch (e) { /* storage may be blocked */ }
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const subjName = (s) => (s === "reading" ? "Reading" : "Math");
+  const RESULT_LABEL = { first: "Right on the first try", helped: "Right with a hint", shown: "Needed the full solution" };
+
+  function css() {
+    if (document.getElementById("nn-done-css")) return;
+    const st = document.createElement("style");
+    st.id = "nn-done-css";
+    st.textContent = `
+      .nn-overlay{position:fixed;inset:0;z-index:9999;overflow-y:auto;background:linear-gradient(180deg,#dbe9ff 0%,#efe4ff 55%,#d9f2df 100%);
+        font-family:Nunito,ui-rounded,'Segoe UI Variable Display','Segoe UI',system-ui,-apple-system,sans-serif;color:#241f4a;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+      .nn-card{max-width:680px;margin:24px auto;background:#fff;border-radius:28px;padding:28px 24px;box-shadow:0 20px 50px -24px rgba(60,40,140,.45)}
+      .nn-center{text-align:center}
+      .nn-owl{width:96px;height:96px;margin:0 auto 8px;display:block}
+      .nn-h1{font-size:clamp(26px,6vw,36px);font-weight:800;margin:6px 0 4px;line-height:1.15}
+      .nn-sub{color:#5b5687;font-size:17px;margin:0 0 18px}
+      .nn-stars{font-size:52px;letter-spacing:6px;margin:6px 0 10px}
+      .nn-stars .off{filter:grayscale(1);opacity:.3}
+      .nn-score{font-size:22px;font-weight:800;margin:4px 0 18px}
+      .nn-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0 18px}
+      .nn-tile{border-radius:18px;padding:14px 10px;text-align:center;background:#f4f1ff}
+      .nn-tile b{display:block;font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
+      .nn-tile span{font-size:13px;color:#5b5687;font-weight:600}
+      .nn-tile.first{background:#e3f7e9}.nn-tile.helped{background:#fff4d6}.nn-tile.shown{background:#ffe6ea}
+      .nn-btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px}
+      .nn-btn{appearance:none;border:0;border-radius:16px;padding:14px 20px;font-family:inherit;font-weight:800;font-size:16px;cursor:pointer;background:#6c5ce7;color:#fff;min-height:48px}
+      .nn-btn.alt{background:#fff4d6;color:#7a5200}.nn-btn.ghost{background:#f1effa;color:#3b3570}
+      .nn-btn:focus-visible,.nn-input:focus-visible{outline:3px solid #2f80ed;outline-offset:2px}
+      .nn-input{font:inherit;font-size:24px;font-weight:800;text-align:center;width:140px;padding:10px;border-radius:14px;border:2px solid #cfc8f5;margin:8px 0}
+      .nn-msg{min-height:22px;color:#c0392b;font-weight:700}
+      .nn-h2{font-size:18px;font-weight:800;margin:22px 0 8px}
+      .nn-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+      .nn-row{border:1px solid #ebe7fb;border-radius:16px;padding:12px 14px}
+      .nn-row .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap}
+      .nn-row .q{font-weight:700;overflow-wrap:anywhere}
+      .nn-row .meta{font-size:14px;color:#5b5687;margin-top:4px;overflow-wrap:anywhere}
+      .nn-chip{font-size:12px;font-weight:800;border-radius:999px;padding:4px 10px;white-space:nowrap}
+      .nn-chip.first{background:#e3f7e9;color:#1d6b3a}.nn-chip.helped{background:#fff4d6;color:#7a5200}.nn-chip.shown{background:#ffe6ea;color:#9b1c33}
+      .nn-chip.strong{background:#e3f7e9;color:#1d6b3a}.nn-chip.close{background:#fff4d6;color:#7a5200}.nn-chip.practice{background:#ffe6ea;color:#9b1c33}
+      .nn-note{background:#f4f1ff;border-radius:16px;padding:14px 16px;line-height:1.5}
+      .nn-small{font-size:13px;color:#6b6795}
+      @media (max-width:480px){.nn-tiles{grid-template-columns:1fr}.nn-card{padding:22px 16px}}
+      @media (prefers-reduced-motion:no-preference){.nn-pop{animation:nnpop .5s ease-out both}@keyframes nnpop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  const OWL = `<svg class="nn-owl" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="56" r="38" fill="#8f7cf0"/><path d="M22 34 Q18 14 28 10 Q34 20 40 28Z M78 34 Q82 14 72 10 Q66 20 60 28Z" fill="#8f7cf0"/><circle cx="38" cy="50" r="13" fill="#fff"/><circle cx="62" cy="50" r="13" fill="#fff"/><circle cx="38" cy="51" r="6" fill="#241f4a"/><circle cx="62" cy="51" r="6" fill="#241f4a"/><path d="M45 62 L55 62 L50 70Z" fill="#ffb02e"/><ellipse cx="50" cy="80" rx="18" ry="10" fill="#c9bff9"/></svg>`;
+
+  function summarize() {
+    const items = round.items.slice().sort((a, b) => a.index - b.index);
+    const count = (r) => items.filter((x) => x.result === r).length;
+    const skills = {};
+    for (const it of items) {
+      const s = (skills[it.skill] = skills[it.skill] || { skill: it.skill, total: 0, first: 0, helped: 0, shown: 0 });
+      s.total++; s[it.result]++;
+    }
+    return {
+      when: new Date().toISOString(),
+      subject: round.subject, grade: round.grade,
+      minutes: Math.max(1, Math.round((Date.now() - round.startedAt) / 60000)),
+      total: items.length, first: count("first"), helped: count("helped"), shown: count("shown"),
+      skills: Object.values(skills), items,
+    };
+  }
+
+  function overlay(html) {
+    css();
+    let el = document.getElementById("nn-done");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "nn-done";
+      el.className = "nn-overlay";
+      el.setAttribute("role", "dialog");
+      el.setAttribute("aria-modal", "true");
+      document.body.appendChild(el);
+    }
+    el.innerHTML = html;
+    el.scrollTop = 0;
+    const focus = el.querySelector("[data-focus]") || el.querySelector("button");
+    if (focus) focus.focus();
+    return el;
+  }
+
+  function newRound() { window.location.reload(); }
+  function goHome() { window.location.href = new URL("./", window.location.href).href; }
+
+  // The child's "You did it!" screen.
+  function finish(skipSave) {
+    const s = summarize();
+    if (!s.total) return newRound();
+    if (skipSave !== true) saveRound({ when: s.when, subject: s.subject, grade: s.grade, total: s.total, first: s.first, helped: s.helped, shown: s.shown, minutes: s.minutes });
+    const right = s.first + s.helped;
+    const stars = right >= s.total * 0.9 ? 3 : right >= s.total * 0.6 ? 2 : 1;
+    const cheer = stars === 3 ? "Amazing work!" : stars === 2 ? "Great job!" : "You finished! Way to keep going!";
+    const el = overlay(`
+      <div class="nn-card nn-center nn-pop">
+        ${OWL}
+        <p class="nn-sub" style="margin:0">Grade ${s.grade} ${subjName(s.subject).toLowerCase()} · round complete</p>
+        <h1 class="nn-h1">${cheer}</h1>
+        <div class="nn-stars" aria-label="${stars} of 3 stars">${[1, 2, 3].map((i) => `<span class="${i <= stars ? "" : "off"}">⭐</span>`).join("")}</div>
+        <p class="nn-score">You got ${right} out of ${s.total}!</p>
+        <div class="nn-tiles">
+          <div class="nn-tile first"><b>${s.first}</b><span>First try</span></div>
+          <div class="nn-tile helped"><b>${s.helped}</b><span>With a hint</span></div>
+          <div class="nn-tile shown"><b>${s.shown}</b><span>Learned the steps</span></div>
+        </div>
+        <p class="nn-sub">Show a grown-up how you did!</p>
+        <div class="nn-btns">
+          <button class="nn-btn alt" data-act="grownup" data-focus>Show a grown-up</button>
+          <button class="nn-btn" data-act="again">Practice more</button>
+          <button class="nn-btn ghost" data-act="home">Home</button>
+        </div>
+      </div>`);
+    el.querySelector('[data-act="grownup"]').onclick = () => gate(s);
+    el.querySelector('[data-act="again"]').onclick = newRound;
+    el.querySelector('[data-act="home"]').onclick = goHome;
+  }
+
+  // A quick grown-ups question before the report, like the parent view.
+  function gate(s) {
+    const a = rnd(6, 12), b = rnd(3, 9);
+    const el = overlay(`
+      <div class="nn-card nn-center">
+        ${OWL}
+        <h1 class="nn-h1">Grown-ups only</h1>
+        <p class="nn-sub">Answer this to see the full report.</p>
+        <form id="nn-gate">
+          <label for="nn-gate-in" style="font-size:24px;font-weight:800">What is ${a} × ${b}?</label><br>
+          <input id="nn-gate-in" class="nn-input" inputmode="numeric" autocomplete="off" data-focus>
+          <p class="nn-msg" id="nn-gate-msg" role="status"></p>
+          <div class="nn-btns">
+            <button class="nn-btn" type="submit">Open report</button>
+            <button class="nn-btn ghost" type="button" data-act="back">Back</button>
+          </div>
+        </form>
+      </div>`);
+    el.querySelector("#nn-gate").onsubmit = (e) => {
+      e.preventDefault();
+      if (Number(el.querySelector("#nn-gate-in").value) === a * b) report(s);
+      else el.querySelector("#nn-gate-msg").textContent = "That's not it. Try again.";
+    };
+    el.querySelector('[data-act="back"]').onclick = () => finish(true);
+  }
+
+  // The grown-up report for this round.
+  function report(s) {
+    const when = new Date(s.when).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const level = (k) => (k.shown === 0 && k.helped === 0 ? ["strong", "Strong"] : k.shown === 0 ? ["close", "Getting there"] : ["practice", "Needs practice"]);
+    const practice = s.skills.filter((k) => k.shown > 0).map((k) => k.skill);
+    const close = s.skills.filter((k) => k.shown === 0 && k.helped > 0).map((k) => k.skill);
+    const strong = s.skills.filter((k) => k.shown === 0 && k.helped === 0).map((k) => k.skill);
+    const list = (arr) => arr.length <= 1 ? arr.join("") : arr.slice(0, -1).join(", ") + " and " + arr[arr.length - 1];
+    let note = "";
+    if (strong.length) note += `<b>Strong:</b> ${esc(list(strong))}. `;
+    if (close.length) note += `<b>Getting there</b> (right after a hint): ${esc(list(close))}. `;
+    if (practice.length) note += `<b>Practice next:</b> ${esc(list(practice))}. Numi showed the full steps for these, so a short review together would help.`;
+    if (!practice.length && !close.length) note += "Every question was right on the first try. Try the next grade up for a challenge.";
+    const history = loadHistory().slice(1, 6);
+    const el = overlay(`
+      <div class="nn-card">
+        <p class="nn-sub" style="margin:0">Report for grown-ups</p>
+        <h1 class="nn-h1">Grade ${s.grade} ${subjName(s.subject).toLowerCase()}: ${s.first + s.helped} of ${s.total} right</h1>
+        <p class="nn-sub">${esc(when)} · about ${s.minutes} minute${s.minutes === 1 ? "" : "s"}</p>
+        <div class="nn-tiles">
+          <div class="nn-tile first"><b>${s.first}</b><span>Right on the first try</span></div>
+          <div class="nn-tile helped"><b>${s.helped}</b><span>Right after a hint</span></div>
+          <div class="nn-tile shown"><b>${s.shown}</b><span>Needed the full solution</span></div>
+        </div>
+        <div class="nn-note">${note}</div>
+        <h2 class="nn-h2">By skill</h2>
+        <ul class="nn-list">${s.skills.map((k) => { const [c, t] = level(k); return `<li class="nn-row"><div class="top"><span class="q">${esc(k.skill)}</span><span class="nn-chip ${c}">${t}</span></div><div class="meta">${k.first + k.helped} of ${k.total} right${k.first ? `, ${k.first} on the first try` : ""}</div></li>`; }).join("")}</ul>
+        <h2 class="nn-h2">Every question</h2>
+        <ul class="nn-list">${s.items.map((it, i) => `<li class="nn-row"><div class="top"><span class="q">${i + 1}. ${esc(it.prompt)}</span><span class="nn-chip ${it.result}">${RESULT_LABEL[it.result]}</span></div>
+          <div class="meta">${esc(it.skill)} · Answer: <b>${esc(it.answer)}</b>${it.wrong.length ? ` · First tried: ${esc(it.wrong.join(", "))}` : ""}${it.hints ? ` · ${it.hints} hint${it.hints === 1 ? "" : "s"}` : ""}</div></li>`).join("")}</ul>
+        ${history.length ? `<h2 class="nn-h2">Earlier rounds on this device</h2><ul class="nn-list">${history.map((h) => `<li class="nn-row"><div class="top"><span class="q">Grade ${h.grade} ${subjName(h.subject).toLowerCase()}</span><span class="nn-small">${esc(new Date(h.when).toLocaleDateString(undefined, { month: "short", day: "numeric" }))}</span></div><div class="meta">${h.first + h.helped} of ${h.total} right · ${h.first} on the first try · ${h.shown} needed the solution</div></li>`).join("")}</ul>` : ""}
+        <p class="nn-small" style="margin-top:16px">Results are saved only on this device. Nothing is sent anywhere.</p>
+        <div class="nn-btns">
+          <button class="nn-btn" data-act="again" data-focus>Practice more</button>
+          <button class="nn-btn ghost" data-act="home">Home</button>
+        </div>
+      </div>`);
+    el.querySelector('[data-act="again"]').onclick = newRound;
+    el.querySelector('[data-act="home"]').onclick = goHome;
+  }
+
   window.NumberNestBank = {
     session,
+    record,
+    finish,
     // For testing: every generator and passage, so they can be checked.
     _math: MATH,
     _reading: READING,

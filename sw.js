@@ -1,7 +1,7 @@
 // NumberNest service worker: keeps the app working offline once it has been opened.
 // The demo is a single self-contained page, so caching these files is enough.
 // Bump CACHE when the app shell changes so installed copies pick up the new version.
-const CACHE = "numbernest-v2";
+const CACHE = "numbernest-v3";
 const SHELL = [
   "./",
   "./index.html",
@@ -34,6 +34,9 @@ self.addEventListener("fetch", (event) => {
   if (!url.pathname.startsWith(new URL("./", self.location).pathname) || url.pathname.includes("/village/")) return;
 
   const key = req.mode === "navigate" ? "./index.html" : req;
+  // The page and question bank: try the network first so updates show right away,
+  // and fall back to the saved copy when offline. Everything else: saved copy first.
+  const networkFirst = req.mode === "navigate" || url.pathname.endsWith("/bank.js") || url.pathname.endsWith("/index.html");
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(key);
@@ -43,7 +46,7 @@ self.addEventListener("fetch", (event) => {
           return res;
         })
         .catch(() => cached);
-      return cached || fresh;
+      return networkFirst ? fresh.then((res) => res || cached) : cached || fresh;
     }),
   );
 });
