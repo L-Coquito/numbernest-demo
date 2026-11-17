@@ -11,8 +11,9 @@ Open `index.html`, or visit the GitHub Pages link for this repository.
 
 `bank.js` holds the question bank. Math questions are generated with new numbers every time:
 five kinds of problems per grade (for example grade 4 has multi-digit multiplication, equivalent
-fractions, adding fractions, comparing fractions and division with remainders). Reading has four
-original passages per grade with two questions each, plus the original passages.
+fractions, adding fractions, comparing fractions and division with remainders). Reading has eight
+new original passages per grade with two questions each, plus the original passages, and rotates
+so the passages read longest ago come back last.
 
 Each session has up to 10 questions, mixes different skills (never the same kind twice in a row),
 shuffles the answer choices, and avoids passages this device
