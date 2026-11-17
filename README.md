@@ -7,6 +7,18 @@ worked solution. The parent report sits behind a grown-ups question.
 
 Open `index.html`, or visit the GitHub Pages link for this repository.
 
+## Questions and passages
+
+`bank.js` holds the question bank. Math questions are generated with new numbers every time:
+five kinds of problems per grade (for example grade 4 has multi-digit multiplication, equivalent
+fractions, adding fractions, comparing fractions and division with remainders). Reading has eight
+new original passages per grade with two questions each, plus the original passages, and rotates
+so the passages read longest ago come back last.
+
+Each session has up to 10 questions, mixes different skills (never the same kind twice in a row),
+shuffles the answer choices, and avoids passages this device
+has already seen (kept in the browser only). **New questions** at the end starts a fresh set.
+
 Everything in the demo is invented placeholder content — no real student data, no network calls,
 no storage. Source lives in a separate private repository.
 
