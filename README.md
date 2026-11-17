@@ -19,6 +19,14 @@ Each session has up to 10 questions, mixes different skills (never the same kind
 shuffles the answer choices, and avoids passages this device
 has already seen (kept in the browser only). **New questions** at the end starts a fresh set.
 
+## Results screen
+
+After the last question, **See my results** opens a completed screen for the child: stars, the
+score, and how many were right on the first try, right after a hint, or needed the full solution.
+**Show a grown-up** asks a quick grown-ups question, then opens a report with results by skill,
+every question with the answer and what was tried first, what to practice next, and earlier rounds.
+Results are kept in the browser on that device only and are never sent anywhere.
+
 Everything in the demo is invented placeholder content — no real student data, no network calls,
 no storage. Source lives in a separate private repository.
 
