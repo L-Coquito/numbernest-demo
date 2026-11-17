@@ -812,7 +812,8 @@
   function finish(skipSave) {
     const s = summarize();
     if (!s.total) return newRound();
-    if (skipSave !== true) saveRound({ when: s.when, subject: s.subject, grade: s.grade, total: s.total, first: s.first, helped: s.helped, shown: s.shown, minutes: s.minutes });
+    if (skipSave !== true) saveRound({ when: s.when, subject: s.subject, grade: s.grade, total: s.total, first: s.first, helped: s.helped, shown: s.shown, minutes: s.minutes,
+      skills: s.skills.map((k) => ({ skill: k.skill, total: k.total, right: k.first + k.helped, first: k.first })) });
     const right = s.first + s.helped;
     const stars = right >= s.total * 0.9 ? 3 : right >= s.total * 0.6 ? 2 : 1;
     const cheer = stars === 3 ? "Amazing work!" : stars === 2 ? "Great job!" : "You finished! Way to keep going!";
@@ -907,10 +908,71 @@
     el.querySelector('[data-act="home"]').onclick = goHome;
   }
 
+  // ---------- real numbers for the parent page and the streak ----------
+  const DAY = 86400000;
+  const dayKey = (d) => { const x = new Date(d); return `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`; };
+  const shortDate = (d) => new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+  function student() {
+    const hist = loadHistory();
+    const days = new Set(hist.map((h) => dayKey(h.when)));
+    let streak = 0;
+    let d = Date.now();
+    if (!days.has(dayKey(d))) d -= DAY; // a streak still counts until the end of today
+    while (days.has(dayKey(d))) { streak++; d -= DAY; }
+    const today = dayKey(Date.now());
+    const minutesToday = hist.filter((h) => dayKey(h.when) === today).reduce((n, h) => n + (h.minutes || 0), 0);
+    return { streakDays: streak, minutesToday };
+  }
+
+  function parentReport() {
+    const since = Date.now() - 7 * DAY;
+    const week = loadHistory().filter((h) => new Date(h.when).getTime() >= since);
+    const range = `${shortDate(since + DAY)} – ${shortDate(Date.now())}`;
+    if (!week.length) {
+      return {
+        weekOf: `Last 7 days (${range})`,
+        minutesPracticed: 0, questionsAttempted: 0, questionsCorrect: 0, groups: [],
+        note: "No practice rounds finished on this device in the last 7 days. When your child finishes a round of 10 questions, the results show up here, by skill.",
+      };
+    }
+    const groups = [];
+    for (const [subject, label] of [["math", "Math"], ["reading", "Reading"]]) {
+      const map = {};
+      for (const h of week.filter((x) => x.subject === subject)) {
+        for (const k of h.skills || []) {
+          const m = (map[k.skill] = map[k.skill] || { name: k.skill, total: 0, right: 0 });
+          m.total += k.total; m.right += k.right;
+        }
+      }
+      const skills = Object.values(map).map((m) => ({ name: m.name, accuracy: m.total ? m.right / m.total : 0 }))
+        .sort((a, b) => b.accuracy - a.accuracy);
+      if (skills.length) groups.push({ subject, label, skills });
+    }
+    const all = groups.flatMap((g) => g.skills);
+    const weakest = all.slice().sort((a, b) => a.accuracy - b.accuracy)[0];
+    const strongest = all.slice().sort((a, b) => b.accuracy - a.accuracy)[0];
+    const rounds = week.length;
+    let note = `${rounds} round${rounds === 1 ? "" : "s"} finished this week. `;
+    if (strongest) note += `Strongest: ${strongest.name} (${Math.round(strongest.accuracy * 100)}% right). `;
+    if (weakest && weakest !== strongest && weakest.accuracy < 0.8) note += `The one to work on: ${weakest.name} (${Math.round(weakest.accuracy * 100)}% right). Doing a round together and talking through the hints helps most.`;
+    else if (weakest) note += "Everything is above 80%. Try the next grade up for a challenge.";
+    return {
+      weekOf: `Last 7 days (${range})`,
+      minutesPracticed: week.reduce((n, h) => n + (h.minutes || 0), 0),
+      questionsAttempted: week.reduce((n, h) => n + (h.total || 0), 0),
+      questionsCorrect: week.reduce((n, h) => n + (h.first || 0) + (h.helped || 0), 0),
+      groups,
+      note,
+    };
+  }
+
   window.NumberNestBank = {
     session,
     record,
     finish,
+    student,
+    parentReport,
     // For testing: every generator and passage, so they can be checked.
     _math: MATH,
     _reading: READING,
