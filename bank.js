@@ -762,6 +762,12 @@
       .nn-chip.strong{background:#e3f7e9;color:#1d6b3a}.nn-chip.close{background:#fff4d6;color:#7a5200}.nn-chip.practice{background:#ffe6ea;color:#9b1c33}
       .nn-note{background:#f4f1ff;border-radius:16px;padding:14px 16px;line-height:1.5}
       .nn-small{font-size:13px;color:#6b6795}
+      .nn-next{border-radius:20px;padding:16px 16px 18px;margin:4px 0 18px;background:#f4f1ff}
+      .nn-next.up{background:#e3f7e9}.nn-next.again{background:#fff4d6}
+      .nn-next-title{font-size:20px;font-weight:800;margin:0;line-height:1.3}
+      .nn-next-text{color:#5b5687;font-size:16px;margin:6px 0 0}
+      .nn-next .nn-btns{margin-top:12px}
+      .nn-btn.go{background:#1f8a4c}.nn-btn.redo{background:#b86e00}
       @media (max-width:480px){.nn-tiles{grid-template-columns:1fr}.nn-card{padding:22px 16px}}
       @media (prefers-reduced-motion:no-preference){.nn-pop{animation:nnpop .5s ease-out both}@keyframes nnpop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}}
     `;
@@ -806,6 +812,33 @@
   }
 
   function newRound() { window.location.reload(); }
+  const TOP_GRADE = 6;
+  // Start a fresh round of the given subject and grade (the app keeps them in the #/tutor link).
+  function playGrade(subject, grade) {
+    window.location.hash = `#/tutor?subject=${encodeURIComponent(subject)}&grade=${encodeURIComponent(grade)}`;
+    window.location.reload();
+  }
+
+  // A friendly next step for the completed screen, based on the score.
+  // 9 or 10 out of 10: try the next grade up. Below 6: play this grade again. 6 to 8: encouragement.
+  // (Rounds are usually 10 questions; shorter rounds use the same 90% and 60% lines.)
+  function suggestion(s) {
+    const right = s.first + s.helped;
+    const grade = Number(s.grade);
+    const subj = subjName(s.subject).toLowerCase();
+    if (right >= s.total * 0.9) {
+      if (grade < TOP_GRADE) {
+        return { kind: "up", title: "Ready for the next level? 🚀", text: `You know grade ${grade} ${subj} really well.`,
+          button: `Try grade ${grade + 1}`, grade: grade + 1 };
+      }
+      return { kind: "up", title: "You're a top-level star! 🏆", text: `Grade ${grade} is the highest level. Keep your skills sharp!` };
+    }
+    if (right < s.total * 0.6) {
+      return { kind: "again", title: "Let's practice this level again 💪", text: "Every round makes your brain stronger.",
+        button: `Play grade ${grade} again`, grade };
+    }
+    return { kind: "keep", title: "You're getting stronger! 🌱", text: "Keep practicing and you'll be ready for the next level soon." };
+  }
   function goHome() { window.location.href = new URL("./", window.location.href).href; }
 
   // The child's "You did it!" screen.
@@ -817,6 +850,7 @@
     const right = s.first + s.helped;
     const stars = right >= s.total * 0.9 ? 3 : right >= s.total * 0.6 ? 2 : 1;
     const cheer = stars === 3 ? "Amazing work!" : stars === 2 ? "Great job!" : "You finished! Way to keep going!";
+    const next = suggestion(s);
     const el = overlay(`
       <div class="nn-card nn-center nn-pop">
         ${OWL}
@@ -829,6 +863,11 @@
           <div class="nn-tile helped"><b>${s.helped}</b><span>With a hint</span></div>
           <div class="nn-tile shown"><b>${s.shown}</b><span>Learned the steps</span></div>
         </div>
+        <div class="nn-next ${next.kind}" data-next="${next.kind}">
+          <p class="nn-next-title">${next.title}</p>
+          <p class="nn-next-text">${esc(next.text)}</p>
+          ${next.button ? `<div class="nn-btns"><button class="nn-btn ${next.kind === "up" ? "go" : "redo"}" data-act="next">${esc(next.button)}</button></div>` : ""}
+        </div>
         <p class="nn-sub">Show a grown-up how you did!</p>
         <div class="nn-btns">
           <button class="nn-btn alt" data-act="grownup" data-focus>Show a grown-up</button>
@@ -839,6 +878,8 @@
     el.querySelector('[data-act="grownup"]').onclick = () => gate(s);
     el.querySelector('[data-act="again"]').onclick = newRound;
     el.querySelector('[data-act="home"]').onclick = goHome;
+    const nextBtn = el.querySelector('[data-act="next"]');
+    if (nextBtn) nextBtn.onclick = () => playGrade(s.subject, next.grade);
   }
 
   // A quick grown-ups question before the report, like the parent view.
