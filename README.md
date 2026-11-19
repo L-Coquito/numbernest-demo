@@ -1,6 +1,6 @@
 # NumberNest — live demo
 
-A clickable demo of the NumberNest tutoring prototype: **grades 1–6, math and reading.**
+A clickable demo of the NumberNest tutoring prototype: **grades 1–6, math, reading and science.**
 
 Hints first, never the answer. After three wrong tries the answer is revealed with a numbered
 worked solution. The parent report sits behind a grown-ups question.
@@ -14,6 +14,10 @@ five kinds of problems per grade (for example grade 4 has multi-digit multiplica
 fractions, adding fractions, comparing fractions and division with remainders). Reading has eight
 new original passages per grade with two questions each, plus the original passages, and rotates
 so the passages read longest ago come back last.
+
+Science has 16 hand-written questions per grade, four for each of four skills (for example grade 3
+has weather and climate, life cycles, forces and magnets, and traits and fossils). Each round picks
+10, starting with ones this device hasn't seen yet, and never asks the same skill twice in a row.
 
 Each session has up to 10 questions, mixes different skills (never the same kind twice in a row),
 shuffles the answer choices, and avoids passages this device

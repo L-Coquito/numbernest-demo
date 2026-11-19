@@ -613,6 +613,328 @@
     return out;
   }
 
+  // ---------- science: hand-written questions, four skills per grade ----------
+  // Each row: [skill, prompt, choices (the first one is right; they get shuffled), hint 1, hint 2, nudge,
+  //            worked steps [title, detail], what Numi says when it's right]
+  const SCIENCE_TOPICS = {
+    1: "Living things, light, sound and the sky",
+    2: "Matter, habitats, plants and a changing Earth",
+    3: "Weather, life cycles, forces and traits",
+    4: "Energy, rocks, animal bodies and waves",
+    5: "Matter, food webs, the water cycle and space",
+    6: "Cells, Earth's layers, weather and heat",
+  };
+  const SCIENCE = {
+    1: [
+      ["What living things need", "What do all animals need to stay alive?", ["Food, water and air", "Toys and books", "Shoes and hats", "A TV"],
+        "Think about what your body needs every day.", "You eat, you drink, and you breathe. Animals do too.", "What do you do at breakfast, and what do you do all the time without thinking?",
+        [["Think about your body", "Every day you eat food, drink water and breathe air."], ["Animals are the same", "Dogs, fish and birds all need food, water and air to live."]], "Yes! Food, water and air keep animals alive."],
+      ["What living things need", "What does a plant need to grow?", ["Sunlight and water", "Candy and juice", "A blanket", "Darkness all the time"],
+        "Plants by a sunny window grow well.", "Plants make their own food using light, and their roots drink.", "Where do plants grow best, in a dark closet or by a sunny window?",
+        [["Plants use light", "Leaves use sunlight to make food for the plant."], ["Plants drink water", "Roots take in water from the soil."]], "Right! Plants need sunlight and water."],
+      ["What living things need", "Which one is a living thing?", ["A tree", "A rock", "A spoon", "A cloud"],
+        "Living things grow and need food or water.", "Does it grow bigger over time? A rock does not.", "Which one started small and grew?",
+        [["What living things do", "Living things grow, need food or water, and make more of their own kind."], ["Check each one", "A tree grows from a seed. A rock, a spoon and a cloud do not grow like that."]], "Yes! A tree is alive. It grows and needs water."],
+      ["What living things need", "Why does a bird build a nest?", ["To keep its eggs and babies safe", "To play a game", "To hide its toys", "To stay cold"],
+        "Think about what is inside a nest.", "Eggs and baby birds need a safe, warm home.", "What do you usually find inside a nest?",
+        [["Look inside", "Nests hold eggs and baby birds."], ["A safe home", "The nest keeps the babies safe and warm until they can fly."]], "Right! Nests keep eggs and baby birds safe."],
+      ["Light and sound", "What makes a sound?", ["Something shaking back and forth", "Something sitting still", "Turning off the lights", "Closing your eyes"],
+        "Touch your throat while you hum.", "You can feel your throat buzz. That buzz is shaking.", "What do you feel on a drum right after you hit it?",
+        [["Feel it", "When you hum, your throat buzzes."], ["Sound is shaking", "Sounds are made when things shake back and forth very fast. Scientists call it vibrating."]], "Yes! Sound comes from things shaking, or vibrating."],
+      ["Light and sound", "Why can't you see in a room with no light at all?", ["We need light to see", "Our eyes fall asleep", "The things disappear", "The room gets smaller"],
+        "Think about what happens when someone turns on a lamp.", "When the light comes on, you can see again. The things never left.", "What changes when you flip on the light switch?",
+        [["Things are still there", "The chair and the bed don't go anywhere in the dark."], ["Light helps us see", "Light bounces off things and into our eyes. No light means we can't see them."]], "Right! We need light to see things."],
+      ["Light and sound", "Which one gives off its own light?", ["The Sun", "The Moon", "A mirror", "A window"],
+        "One of these is a giant ball of hot, glowing gas.", "The Moon and a mirror only bounce light from somewhere else.", "Which one shines even when nothing else is shining on it?",
+        [["Making light", "The Sun is a star. Stars make their own light."], ["Bouncing light", "The Moon, a mirror and a window do not make light. They only bounce it or let it through."]], "Yes! The Sun makes its own light."],
+      ["Light and sound", "What happens when you stand in front of a lamp?", ["Your body makes a shadow", "You turn see-through", "The lamp turns off", "Nothing at all"],
+        "Your body blocks some of the light.", "Where light is blocked, there is a dark shape.", "What dark shape follows you on a sunny day?",
+        [["Blocking light", "Light cannot go through your body."], ["A shadow", "The dark place behind you, where the light can't reach, is your shadow."]], "Right! You block the light and make a shadow."],
+      ["The sky", "When can we see the Sun in the sky?", ["In the daytime", "Only at midnight", "Never", "Only when it rains"],
+        "Think about when it is bright outside.", "The Sun is what makes the day bright.", "Is it light or dark outside when you eat lunch?",
+        [["Day", "During the day, our side of Earth faces the Sun."], ["Night", "At night our side faces away, so we can't see the Sun."]], "Yes! We see the Sun in the daytime."],
+      ["The sky", "What can we often see in the sky at night?", ["The Moon and stars", "A rainbow", "The Sun", "Butterflies"],
+        "Look up on a clear night.", "There's a big round or curved shape and lots of tiny twinkles.", "What twinkles at night?",
+        [["Night sky", "When the Sun is gone, the sky is dark."], ["What we see", "On a clear night we can see the Moon and many stars."]], "Right! The Moon and stars shine at night."],
+      ["The sky", "Why is it colder at night than in the day?", ["The Sun is not warming the ground", "The Moon is cold", "The stars make cold air", "Night is longer"],
+        "Think about what warms you up outside.", "Sunshine warms the ground and air. At night there is no sunshine.", "What feels warm on your face on a sunny day?",
+        [["Sun warms", "During the day, sunlight warms the land and air."], ["No Sun", "At night the Sun isn't shining on us, so things cool down."]], "Yes! Without the Sun's warmth it gets colder."],
+      ["The sky", "The Sun seems to move across the sky each day. Where does it rise?", ["In the east", "In the north", "Under the ground", "It doesn't rise"],
+        "Morning starts on one side of the sky.", "The Sun rises in the east and sets in the west.", "Which direction is 'sunrise'?",
+        [["Morning", "Every morning the Sun appears on the east side of the sky."], ["Evening", "In the evening it sets on the west side."]], "Right! The Sun rises in the east."],
+      ["Animal parents and babies", "How is a baby duck like its parents?", ["It has feathers and a bill", "It has fur", "It has fins", "It has wheels"],
+        "Ducklings grow up to be ducks.", "Think about what grown-up ducks have on their body and face.", "What covers a duck's body?",
+        [["Parents and babies", "Babies look a lot like their parents."], ["Ducks", "Ducks and ducklings both have feathers and a flat bill."]], "Yes! Ducklings have feathers and bills like their parents."],
+      ["Animal parents and babies", "What does a young kangaroo ride in?", ["Its mother's pouch", "A nest in a tree", "A shell", "A cave under water"],
+        "Mother kangaroos have a special pocket.", "The pocket is on the mother's belly.", "Where does a baby kangaroo, called a joey, stay safe?",
+        [["A special pocket", "Mother kangaroos have a pouch on their belly."], ["Safe and warm", "The joey rides there and drinks milk while it grows."]], "Right! A joey rides in its mother's pouch."],
+      ["Animal parents and babies", "Why do baby animals cry or call out?", ["To get help from their parents", "To scare the rain away", "Because they are bored", "To make the Sun rise"],
+        "Think about what a hungry baby needs.", "The noise tells the parent something is needed.", "Who comes when a baby bird chirps loudly?",
+        [["A signal", "Crying or chirping tells the parent the baby needs something."], ["Parents help", "The parent brings food or keeps the baby warm and safe."]], "Yes! Calling out gets the parent to help."],
+      ["Animal parents and babies", "Which baby looks a lot like its parent?", ["A puppy", "A caterpillar", "A tadpole", "An egg"],
+        "Some babies change a lot as they grow. Others look like small grown-ups.", "A caterpillar becomes a butterfly, and a tadpole becomes a frog.", "Which one already looks like a small dog?",
+        [["Big changes", "Caterpillars and tadpoles change shape a lot as they grow."], ["Small grown-ups", "A puppy already looks like a small dog."]], "Right! A puppy looks like a small dog."],
+    ],
+    2: [
+      ["Solids, liquids and gases", "Which one is a liquid?", ["Milk", "A brick", "A pencil", "Air"],
+        "A liquid can be poured and takes the shape of its cup.", "A brick keeps its shape. Air is a gas.", "Which one can you pour into a glass?",
+        [["What liquids do", "Liquids flow and take the shape of whatever holds them."], ["Check each one", "Milk pours. A brick and a pencil are solids. Air is a gas."]], "Yes! Milk is a liquid."],
+      ["Solids, liquids and gases", "What happens to an ice cube left in a warm room?", ["It melts into water", "It gets bigger", "It turns into a rock", "It stays the same"],
+        "Ice is frozen water.", "Warmth changes a solid into a liquid.", "What do you see in the dish after a while?",
+        [["Ice is solid water", "Ice is water that got cold enough to freeze."], ["Warming melts it", "Heat turns the ice back into liquid water."]], "Right! Warmth melts ice into water."],
+      ["Solids, liquids and gases", "Which one is a solid?", ["A wooden block", "Juice", "Steam", "Rain"],
+        "A solid keeps its own shape.", "Juice and rain pour. Steam floats away.", "Which one stays the same shape on a table?",
+        [["What solids do", "Solids keep their shape unless you break or bend them."], ["Check", "A wooden block keeps its shape. The others flow or float."]], "Yes! A wooden block is a solid."],
+      ["Solids, liquids and gases", "When water in a puddle dries up on a sunny day, where does it go?", ["Into the air as water vapor", "Into outer space right away", "It turns into sand", "It hides under the puddle"],
+        "The Sun warms the water.", "Warm water slowly turns into a gas you can't see.", "What is the gas form of water called?",
+        [["Heat from the Sun", "Sunlight warms the puddle."], ["Evaporation", "The water turns into water vapor, a gas, and mixes into the air."]], "Right! It evaporates into the air as water vapor."],
+      ["Habitats", "Which animal lives in the ocean?", ["A whale", "A camel", "A squirrel", "A cow"],
+        "Think about who swims in salt water.", "A camel lives in the desert. A squirrel lives in trees.", "Which animal is the biggest swimmer?",
+        [["A habitat is a home", "Animals live where they can find food, water and shelter."], ["Ocean animals", "Whales live and swim in the ocean."]], "Yes! Whales live in the ocean."],
+      ["Habitats", "Why can a camel live in the desert?", ["It can go a long time without water", "It loves snow", "It breathes under water", "It eats ice"],
+        "Deserts are very dry.", "A camel's body saves water and fat for long trips.", "What is hard to find in a desert?",
+        [["Desert life", "Deserts get very little rain."], ["Camel bodies", "Camels can go many days without drinking, so they do well there."]], "Right! Camels can go a long time without water."],
+      ["Habitats", "A polar bear has thick fur and fat. What habitat is it built for?", ["A cold, icy place", "A hot desert", "A rainforest tree", "A pond"],
+        "Thick fur is like a warm coat.", "You wear a thick coat when it's freezing.", "Where would you need a big, warm coat?",
+        [["Body clues", "Thick fur and fat keep an animal warm."], ["Habitat", "Polar bears live in the icy Arctic."]], "Yes! Polar bears are built for cold, icy places."],
+      ["Habitats", "What does a habitat give an animal?", ["Food, water and shelter", "Money", "A bike", "A phone"],
+        "Think about what an animal needs to survive.", "It needs to eat, drink and stay safe.", "What three things keep an animal alive and safe?",
+        [["What animals need", "Animals need food, water and a safe place."], ["Habitat", "A good habitat has all three."]], "Right! A habitat gives food, water and shelter."],
+      ["Plants and seeds", "What part of a plant takes in water from the soil?", ["The roots", "The flowers", "The leaves", "The fruit"],
+        "This part is under the ground.", "It grows down into the dirt.", "Which part do you usually not see?",
+        [["Under the ground", "Roots grow down into the soil."], ["Drinking water", "Roots soak up water and send it up the plant."]], "Yes! Roots take in water."],
+      ["Plants and seeds", "How can seeds travel to new places?", ["Wind, water and animals carry them", "They walk on little legs", "They drive", "They never move"],
+        "Think of a dandelion puff.", "Some seeds stick to fur, and some float.", "What happens when you blow on a dandelion?",
+        [["Wind", "Light seeds like dandelion seeds float on the wind."], ["Animals and water", "Some seeds stick to fur or get eaten and dropped. Some float on water."]], "Right! Wind, water and animals spread seeds."],
+      ["Plants and seeds", "A plant was kept in a dark closet for two weeks. What probably happened?", ["It got weak and pale", "It grew faster", "It turned bright green", "It grew flowers"],
+        "Plants need light to make food.", "Without light, a plant can't make enough food.", "What do plants need from the Sun?",
+        [["Plants need light", "Leaves use light to make food."], ["No light", "In the dark the plant can't make food, so it gets weak and pale."]], "Yes! Without light, the plant gets weak and pale."],
+      ["Plants and seeds", "How do bees help flowers?", ["They carry pollen from flower to flower", "They water them", "They paint them", "They pull them up"],
+        "Bees get a yellow dust on their bodies.", "That dust is pollen. Flowers need it to make seeds.", "What sticks to a bee's fuzzy legs?",
+        [["Pollen", "Flowers make a powder called pollen."], ["Carrying it", "Bees move pollen between flowers, which helps the flowers make seeds."]], "Right! Bees carry pollen and help flowers make seeds."],
+      ["A changing Earth", "Over many years, a river can make a deep canyon. How?", ["Moving water wears away rock", "The rocks melt", "Animals dig it", "The wind fills it in"],
+        "Water keeps rubbing on the rock, day after day.", "Tiny bits of rock get carried away by the water.", "What does flowing water do to rock over a long time?",
+        [["Wearing away", "Moving water slowly carries away tiny pieces of rock. This is called erosion."], ["Long time", "After thousands of years, the river cuts a deep canyon."]], "Yes! Moving water wears away rock."],
+      ["A changing Earth", "Which change to land happens very fast?", ["An earthquake", "A canyon forming", "A mountain wearing down", "Soil forming"],
+        "Some changes take thousands of years. One takes seconds.", "Shaking ground can change land in moments.", "Which one could happen while you watch?",
+        [["Slow changes", "Canyons, mountains wearing down and soil forming take a very long time."], ["Fast change", "An earthquake can change the land in seconds."]], "Right! Earthquakes change land quickly."],
+      ["A changing Earth", "How can planting grass on a hill help?", ["Roots hold the soil so rain won't wash it away", "It makes the hill taller", "It stops the wind forever", "It makes rocks"],
+        "Grass roots grab onto the dirt.", "Rain can wash bare dirt down a hill.", "What part of the grass holds the dirt?",
+        [["Bare soil", "Rain can wash loose soil down a hill."], ["Roots hold on", "Grass roots hold the soil in place."]], "Yes! Roots keep the soil from washing away."],
+      ["A changing Earth", "Where is most of Earth's water?", ["In the oceans", "In ponds", "In clouds", "In puddles"],
+        "Think about what covers most of a globe.", "The blue parts of a map are mostly salt water.", "What is the biggest kind of water on Earth?",
+        [["Look at a globe", "Most of Earth is covered by blue water."], ["Oceans", "Most of that water is in the salty oceans."]], "Right! Most of Earth's water is in the oceans."],
+    ],
+    3: [
+      ["Weather and climate", "What tool measures how hot or cold the air is?", ["A thermometer", "A ruler", "A scale", "A clock"],
+        "'Thermo' means heat.", "This tool shows temperature in degrees.", "What do you use to check if you have a fever?",
+        [["Temperature", "Hot and cold are measured as temperature."], ["The tool", "A thermometer measures temperature."]], "Yes! A thermometer measures temperature."],
+      ["Weather and climate", "What is the difference between weather and climate?", ["Weather is today; climate is the usual pattern over many years", "They are the same", "Climate is only rain", "Weather only happens at night"],
+        "One is about right now. The other is about many years.", "'It's raining today' is weather. 'Summers here are hot' is climate.", "Which word describes what an area is usually like?",
+        [["Weather", "Weather is what the air is like at one time, like today."], ["Climate", "Climate is the usual weather in a place over many years."]], "Right! Weather is now; climate is the long-term pattern."],
+      ["Weather and climate", "Which is the best way to stay safe in a thunderstorm?", ["Go inside a building", "Stand under a tall tree", "Swim in a lake", "Fly a kite"],
+        "Lightning likes tall things and water.", "A building gives the safest shelter.", "Where should you go when you hear thunder?",
+        [["Lightning danger", "Lightning can hit tall objects and water."], ["Stay safe", "Going inside a building is the safest choice."]], "Yes! Go inside during a thunderstorm."],
+      ["Weather and climate", "A place is hot and gets lots of rain all year. What climate is it?", ["Tropical", "Polar", "Desert", "Arctic tundra"],
+        "Rainforests have this climate.", "Polar and tundra places are cold. Deserts are dry.", "What climate do rainforests have?",
+        [["Clues", "Hot and very rainy all year."], ["Name", "That is a tropical climate, where rainforests grow."]], "Right! That's a tropical climate."],
+      ["Life cycles", "What is the right order of a butterfly's life cycle?", ["Egg, caterpillar, chrysalis, butterfly", "Butterfly, egg, chrysalis, caterpillar", "Caterpillar, egg, butterfly, chrysalis", "Chrysalis, butterfly, caterpillar, egg"],
+        "Every life cycle starts with an egg.", "The caterpillar makes a chrysalis before it becomes a butterfly.", "What hatches from the egg?",
+        [["Start", "A butterfly lays an egg. A caterpillar hatches."], ["Change", "The caterpillar forms a chrysalis and comes out as a butterfly."]], "Yes! Egg, caterpillar, chrysalis, butterfly."],
+      ["Life cycles", "A tadpole lives in water and breathes with gills. What does it grow into?", ["A frog", "A fish", "A turtle", "A duck"],
+        "This animal grows legs and loses its tail.", "It can live on land and in water when it grows up.", "Which animal says 'ribbit'?",
+        [["Tadpole", "A tadpole hatches from a frog egg."], ["Growing up", "It grows legs, loses its tail, and becomes a frog."]], "Right! A tadpole grows into a frog."],
+      ["Life cycles", "What do all life cycles have in common?", ["Living things are born, grow, make young and die", "They all have a chrysalis", "They all hatch from eggs", "They all live in water"],
+        "Not all animals hatch from eggs, so it can't be that.", "Think about what happens to every living thing over time.", "What do a puppy and a seedling both do?",
+        [["Different paths", "Some animals hatch, some are born, and plants grow from seeds."], ["Same pattern", "All are born or sprout, grow up, can make young, and die."]], "Yes! Born, grow, make young, and die."],
+      ["Life cycles", "How does a sunflower start its life?", ["As a seed", "As an egg", "As a caterpillar", "As a tadpole"],
+        "Plants don't hatch from eggs.", "You can plant this in soil.", "What do you put in the ground to grow a flower?",
+        [["Plants start small", "Most plants start as seeds."], ["Growing", "The seed sprouts, grows into a plant, and makes flowers and new seeds."]], "Right! A sunflower starts as a seed."],
+      ["Forces and magnets", "What will a magnet pick up?", ["A steel paper clip", "A wooden stick", "A plastic spoon", "A rubber band"],
+        "Magnets pull on some metals.", "Wood, plastic and rubber are not pulled by magnets.", "Which one is made of metal?",
+        [["Magnets", "Magnets attract iron and steel."], ["Check", "A steel paper clip sticks. Wood, plastic and rubber don't."]], "Yes! Magnets pick up steel paper clips."],
+      ["Forces and magnets", "What happens when you hold the north ends of two magnets together?", ["They push apart", "They stick together", "They melt", "They turn into one magnet"],
+        "Same ends act differently from opposite ends.", "Opposites attract. Same ends repel.", "Do two north ends attract or repel?",
+        [["Poles", "Every magnet has a north end and a south end."], ["Same ends", "Two north ends push away from each other. That's called repelling."]], "Right! Same ends push apart."],
+      ["Forces and magnets", "You push a toy car softly, then hard. What happens with the hard push?", ["It goes faster and farther", "It goes slower", "It doesn't move", "It goes backward"],
+        "A push is a force.", "A bigger force makes a bigger change in motion.", "Which push sends the car farther?",
+        [["Forces", "A push or a pull is a force."], ["Bigger force", "A harder push makes the car speed up more and go farther."]], "Yes! A harder push makes it go faster and farther."],
+      ["Forces and magnets", "Why does a ball rolling on grass stop sooner than on a smooth floor?", ["Grass causes more friction", "Grass is magnetic", "The floor pushes it", "Balls don't like grass"],
+        "Friction is a force that slows things down.", "Rough surfaces rub more than smooth ones.", "Which surface is rougher?",
+        [["Friction", "Friction happens when two surfaces rub. It slows moving things."], ["Rough vs smooth", "Grass is rougher than a smooth floor, so it slows the ball faster."]], "Right! More friction on grass stops the ball sooner."],
+      ["Traits and fossils", "Why do puppies often look like their parents?", ["They get traits from their parents", "They copy them", "They eat the same food", "They live in the same house"],
+        "Traits like fur color are passed down.", "Babies get these traits from their mom and dad.", "What do we call features passed from parents to young?",
+        [["Traits", "A trait is a feature, like fur color or ear shape."], ["Inherited", "Puppies inherit traits from their parents."]], "Yes! Puppies inherit traits from their parents."],
+      ["Traits and fossils", "What is a fossil?", ["The remains or print of a living thing from long ago", "A shiny new rock", "A kind of cloud", "A plant that is alive today"],
+        "Dinosaur bones are one kind.", "Fossils are often found in rock.", "What can tell us about animals from millions of years ago?",
+        [["Long ago", "When some plants and animals died long ago, they were buried."], ["Turned to rock", "Over time, their shape or bones were kept in rock. These are fossils."]], "Right! Fossils are remains or prints from long ago."],
+      ["Traits and fossils", "A fossil of a fish was found on a mountain. What does that tell us?", ["The area was once covered by water", "Fish can climb", "Someone dropped it", "Mountains make fish"],
+        "Fish live in water.", "The land must have been very different long ago.", "Where did the fish live when it was alive?",
+        [["Fish need water", "Fish can only live in water."], ["Land changes", "A fish fossil on a mountain means water once covered that land."]], "Yes! That land was once under water."],
+      ["Traits and fossils", "A rabbit has white fur in winter and brown fur in summer. How does this help it?", ["It blends in and hides from predators", "It stays wet", "It runs slower", "It makes it louder"],
+        "Think about the color of the ground in winter and summer.", "Snow is white. Dirt and plants in summer are brown.", "Why would matching the ground help a rabbit?",
+        [["Matching", "White fur matches snow. Brown fur matches dirt and dry plants."], ["Hiding", "Blending in helps the rabbit hide from foxes and hawks. This is called camouflage."]], "Right! It blends in to hide from predators."],
+    ],
+    4: [
+      ["Energy", "A ball is rolling down a hill. What kind of energy does a moving ball have?", ["Motion energy", "Sound energy only", "No energy", "Light energy"],
+        "Anything that moves has this kind of energy.", "The faster it moves, the more it has.", "What do we call the energy of moving things?",
+        [["Moving things", "Moving objects have motion energy (kinetic energy)."], ["Speed", "A faster ball has more motion energy."]], "Yes! A rolling ball has motion energy."],
+      ["Energy", "What happens when you rub your hands together quickly?", ["They get warm", "They get cold", "They turn blue", "They get wet"],
+        "Try it now.", "Rubbing turns motion energy into heat.", "How do your hands feel after rubbing?",
+        [["Friction", "Rubbing makes friction."], ["Heat", "Friction changes motion energy into heat, so your hands warm up."]], "Right! Rubbing makes heat."],
+      ["Energy", "A flashlight changes energy from its battery into what?", ["Light", "Wind", "Water", "Food"],
+        "What comes out of a flashlight?", "The battery stores energy, and the bulb gives it off.", "Why do you use a flashlight in the dark?",
+        [["Stored energy", "A battery stores energy."], ["Changed energy", "The flashlight changes it into light, and a little heat."]], "Yes! It changes stored energy into light."],
+      ["Energy", "Which is a renewable energy source that won't run out?", ["Sunlight", "Coal", "Oil", "Natural gas"],
+        "Renewable means it keeps coming back.", "Coal, oil and gas take millions of years to form.", "Which one shines every day?",
+        [["Renewable", "Renewable sources are replaced naturally and quickly."], ["Check", "Sunlight returns every day. Coal, oil and gas will run out."]], "Right! Sunlight is renewable."],
+      ["Rocks and erosion", "What is weathering?", ["Breaking rock into smaller pieces", "Making rain", "Building a volcano", "Melting ice"],
+        "It happens to rocks over time.", "Water, ice, wind and plant roots can crack rock.", "What happens to a big rock over many years?",
+        [["Breaking down", "Weathering breaks rock into smaller pieces."], ["Causes", "Water, ice, wind and plant roots all help."]], "Yes! Weathering breaks rock into smaller pieces."],
+      ["Rocks and erosion", "Water gets into a crack in a rock and freezes. What happens?", ["The ice spreads and makes the crack bigger", "The rock gets smaller instantly", "The crack disappears", "The rock melts"],
+        "Water takes up more space when it freezes.", "The growing ice pushes on the rock.", "What does freezing water do to a crack?",
+        [["Ice expands", "Water gets bigger when it freezes."], ["Pushing", "The ice pushes the crack wider. Over and over, this breaks the rock."]], "Right! Freezing water widens cracks."],
+      ["Rocks and erosion", "What is erosion?", ["Moving bits of rock and soil to a new place", "Making new rocks from nothing", "Rocks growing", "Ice turning into rock"],
+        "Weathering breaks rock. Erosion moves it.", "Wind, water and ice carry the pieces.", "What do rivers do with sand and mud?",
+        [["Breaking vs moving", "Weathering breaks rock; erosion carries the pieces away."], ["Carriers", "Water, wind and ice move soil and rock to new places."]], "Yes! Erosion moves rock and soil."],
+      ["Rocks and erosion", "Which rock forms when lava cools?", ["Igneous rock", "Sedimentary rock", "Fossil rock", "Sand"],
+        "Lava is melted rock.", "'Igneous' comes from a word for fire.", "Which rock is made from fire-hot melted rock?",
+        [["Melted rock", "Lava is melted rock from a volcano."], ["Cooling", "When it cools and hardens, it becomes igneous rock."]], "Right! Cooled lava makes igneous rock."],
+      ["Animal bodies and senses", "Why does an owl have big eyes?", ["To see in the dark when it hunts at night", "To look pretty", "To swim", "To stay cool"],
+        "Owls are awake at night.", "Big eyes let in more light.", "When do owls hunt?",
+        [["Night hunters", "Most owls hunt at night."], ["Big eyes", "Big eyes collect more light, so owls see well in the dark."]], "Yes! Big eyes help owls see at night."],
+      ["Animal bodies and senses", "How does a fish breathe under water?", ["With gills", "With lungs", "Through its tail", "It doesn't breathe"],
+        "Fish don't come up for air like whales.", "This body part takes oxygen out of water.", "What are the slits on the sides of a fish's head?",
+        [["Oxygen", "Fish need oxygen, which is in the water."], ["Gills", "Gills take oxygen from the water as it passes through."]], "Right! Fish breathe with gills."],
+      ["Animal bodies and senses", "What part of your body sends messages to your brain about what you touch?", ["Nerves", "Hair", "Fingernails", "Teeth"],
+        "These are like tiny wires in your body.", "They carry signals from your skin to your brain.", "What carries messages through your body?",
+        [["Sensing touch", "Your skin senses touch."], ["Messages", "Nerves carry that message to your brain."]], "Yes! Nerves carry messages to your brain."],
+      ["Animal bodies and senses", "A cactus has thick stems and sharp spines. How do these help it?", ["Store water and keep animals away", "Help it swim", "Make it grow fast in snow", "Help it fly"],
+        "Cactuses live in dry deserts.", "Thick stems hold water. Spines poke.", "Why would a plant in a desert need to save water?",
+        [["Thick stems", "The stem stores water for dry times."], ["Spines", "Sharp spines keep thirsty animals from eating it."]], "Right! They store water and protect the plant."],
+      ["Waves", "What do sound waves need to travel through?", ["Matter like air, water or solids", "Empty space", "Only light", "Nothing"],
+        "In space there is no air.", "Sound travels by making things vibrate.", "Can astronauts hear each other in space without radios?",
+        [["Vibrations", "Sound is vibrations passing from particle to particle."], ["Needs matter", "Sound needs air, water or a solid. It can't travel through empty space."]], "Yes! Sound needs matter to travel."],
+      ["Waves", "Why do you see lightning before you hear thunder?", ["Light travels faster than sound", "Sound travels faster than light", "Thunder happens later", "Your ears are slow"],
+        "Both happen at the same moment.", "One kind of wave is much faster.", "Which is faster, light or sound?",
+        [["Same time", "Lightning and thunder happen together."], ["Speed", "Light travels much faster than sound, so you see it first."]], "Right! Light is faster than sound."],
+      ["Waves", "What happens to light when it hits a mirror?", ["It bounces off (reflects)", "It disappears", "It turns into sound", "It stops"],
+        "You can see yourself in a mirror.", "Light comes back toward your eyes.", "What is it called when light bounces?",
+        [["Hitting a mirror", "Light hits the smooth, shiny surface."], ["Reflection", "It bounces back. That's reflection."]], "Yes! Light reflects off a mirror."],
+      ["Waves", "A water wave moves across a pond. A floating leaf bobs up and down. What does this show?", ["Waves move energy, not the water itself", "The leaf is swimming", "The pond is tilted", "Waves move the whole pond"],
+        "The leaf stays in about the same spot.", "The wave passes by, but the water mostly moves up and down.", "Does the leaf travel across the pond?",
+        [["The leaf", "The leaf bobs up and down but stays in place."], ["Energy", "Waves carry energy across the water while the water mostly stays put."]], "Right! Waves carry energy."],
+    ],
+    5: [
+      ["Matter and mixtures", "You stir salt into water until you can't see it. What happened?", ["The salt dissolved", "The salt disappeared forever", "The salt turned into water", "The water turned into salt"],
+        "The salt is still there.", "Taste it, and it's salty. The salt mixed in tiny pieces.", "If the water dried up, what would be left?",
+        [["Mixing", "Salt breaks into tiny pieces in the water."], ["Dissolving", "It dissolved. If the water evaporates, the salt is left behind."]], "Yes! The salt dissolved."],
+      ["Matter and mixtures", "Which is a physical change?", ["Cutting paper", "Burning wood", "Baking a cake", "Rusting iron"],
+        "A physical change doesn't make a new substance.", "Burning, baking and rusting make new substances.", "After the change, is it still paper?",
+        [["Physical change", "Only size, shape or state changes."], ["Check", "Cut paper is still paper. Burning, baking and rusting make something new."]], "Right! Cutting paper is a physical change."],
+      ["Matter and mixtures", "How could you separate iron filings from sand?", ["Use a magnet", "Add water and freeze it", "Shake it", "Heat it up"],
+        "Iron has a special property sand doesn't.", "Magnets pull on iron.", "Which tool attracts iron?",
+        [["Properties", "Iron is magnetic. Sand is not."], ["Separate", "A magnet pulls out the iron and leaves the sand."]], "Yes! A magnet separates iron from sand."],
+      ["Matter and mixtures", "When 50 grams of water and 10 grams of sugar are mixed, how much does the mixture weigh?", ["60 grams", "50 grams", "40 grams", "10 grams"],
+        "Matter is not lost when things mix.", "Add the two amounts together.", "What is 50 + 10?",
+        [["Matter is conserved", "When things mix, the total amount of matter stays the same."], ["Add", "50 grams + 10 grams = 60 grams."]], "Right! 60 grams. Matter isn't lost."],
+      ["Food webs", "In a food chain, where do plants get their energy?", ["From sunlight", "From eating animals", "From rocks", "From the Moon"],
+        "Plants make their own food.", "They use light to do it.", "What shines on leaves?",
+        [["Producers", "Plants are producers. They make their own food."], ["Sunlight", "They use energy from sunlight to make sugar."]], "Yes! Plants get energy from sunlight."],
+      ["Food webs", "In this food chain, grass → rabbit → fox, what is the rabbit?", ["A consumer that eats plants", "A producer", "A decomposer", "The Sun"],
+        "The rabbit eats the grass.", "Animals that eat other living things are consumers.", "Does the rabbit make its own food?",
+        [["Producer", "Grass makes its own food."], ["Consumer", "The rabbit eats grass, so it is a consumer (an herbivore)."]], "Right! The rabbit is a plant-eating consumer."],
+      ["Food webs", "What do decomposers like mushrooms and worms do?", ["Break down dead things and return nutrients to the soil", "Make food from sunlight", "Hunt foxes", "Make rain"],
+        "They are nature's recyclers.", "They feed on dead plants and animals.", "What happens to fallen leaves over time?",
+        [["Dead matter", "Decomposers eat dead plants and animals."], ["Recycling", "They break it down into nutrients that go back into the soil for plants."]], "Yes! Decomposers recycle nutrients."],
+      ["Food webs", "If all the rabbits in a field disappeared, what would probably happen to the foxes that eat them?", ["They would have less food", "They would have more food", "Nothing would change", "They would eat grass"],
+        "Foxes depend on rabbits.", "Fewer rabbits means fewer meals.", "What would the foxes eat?",
+        [["Connections", "In a food web, animals depend on what they eat."], ["Less food", "Without rabbits, foxes have less food, so there might be fewer foxes."]], "Right! The foxes would have less food."],
+      ["The water cycle", "What is it called when water vapor cools and forms tiny drops in clouds?", ["Condensation", "Evaporation", "Erosion", "Melting"],
+        "It's the opposite of evaporation.", "Think of drops on a cold glass of lemonade.", "What forms on the outside of a cold cup?",
+        [["Cooling vapor", "Water vapor cools high in the sky."], ["Condensation", "It turns back into tiny liquid drops. That's condensation, and the drops form clouds."]], "Yes! That's condensation."],
+      ["The water cycle", "What powers the water cycle?", ["The Sun", "The Moon", "Wind turbines", "Fish"],
+        "Something has to heat water to make it evaporate.", "It's the biggest source of heat for Earth.", "What warms oceans and lakes?",
+        [["Evaporation needs heat", "Water evaporates when it's warmed."], ["Sun", "The Sun's heat drives evaporation, which keeps the water cycle going."]], "Right! The Sun powers the water cycle."],
+      ["The water cycle", "Rain, snow, sleet and hail are all kinds of what?", ["Precipitation", "Evaporation", "Condensation", "Collection"],
+        "These all fall from clouds.", "The word starts with 'pre'.", "What do we call water falling from the sky?",
+        [["Falling water", "When drops in clouds get heavy, they fall."], ["Precipitation", "Rain, snow, sleet and hail are precipitation."]], "Yes! They're all precipitation."],
+      ["The water cycle", "Where does most of the water that evaporates come from?", ["The oceans", "Puddles", "Snowmen", "Bathtubs"],
+        "It's where most of Earth's water is.", "Oceans cover most of Earth.", "What is the biggest body of water?",
+        [["Most water", "About 97% of Earth's water is in the oceans."], ["Evaporation", "So most evaporation happens from the ocean surface."]], "Right! Most comes from the oceans."],
+      ["The Sun, Moon and stars", "Why does the Sun look bigger and brighter than other stars?", ["It is much closer to Earth", "It is the biggest star", "Other stars are turned off", "It is a planet"],
+        "The Sun is a fairly average star.", "Other stars are extremely far away.", "Do things look bigger when they're near or far?",
+        [["Average star", "The Sun is a medium-sized star."], ["Distance", "It's much closer than any other star, so it looks bigger and brighter."]], "Yes! It's much closer."],
+      ["The Sun, Moon and stars", "What causes day and night?", ["Earth spinning on its axis", "The Sun moving around Earth", "The Moon blocking the Sun", "Clouds"],
+        "Earth turns all the way around once a day.", "When your side faces the Sun, it's day.", "How long does Earth take to spin once?",
+        [["Spinning", "Earth spins once about every 24 hours."], ["Day and night", "The side facing the Sun has day. The side facing away has night."]], "Right! Earth's spinning causes day and night."],
+      ["The Sun, Moon and stars", "At noon your shadow is short. Late in the afternoon it is long. Why?", ["The Sun is lower in the sky", "You grew taller", "The Sun got bigger", "The ground moved"],
+        "Shadows depend on where the light comes from.", "Low light makes long shadows.", "Where is the Sun at noon compared to late afternoon?",
+        [["High Sun", "At noon the Sun is high, so shadows are short."], ["Low Sun", "Later the Sun is low in the sky, so shadows stretch long."]], "Yes! A lower Sun makes longer shadows."],
+      ["The Sun, Moon and stars", "Why does the Moon seem to change shape during a month?", ["We see different amounts of its sunlit side", "It really changes shape", "Earth's shadow eats it", "Clouds cover parts"],
+        "The Moon is always round.", "Half the Moon is always lit by the Sun. We see different parts of that half.", "What do we call the Moon's changing shapes?",
+        [["Lit half", "The Sun always lights half of the Moon."], ["Phases", "As the Moon orbits Earth, we see more or less of the lit half. These are phases."]], "Right! We see different amounts of the lit side."],
+    ],
+    6: [
+      ["Cells", "What is the basic unit of all living things?", ["The cell", "The atom", "The organ", "The skeleton"],
+        "All living things are made of these.", "You need a microscope to see most of them.", "What are tiny building blocks of life?",
+        [["Building blocks", "Every living thing is made of one or more cells."], ["Basic unit", "The cell is the smallest unit that is alive."]], "Yes! The cell is the basic unit of life."],
+      ["Cells", "Which part of a plant cell makes food using sunlight?", ["Chloroplast", "Nucleus", "Cell membrane", "Vacuole"],
+        "This part is green.", "It's where photosynthesis happens.", "Which part holds chlorophyll?",
+        [["Photosynthesis", "Plants make sugar from sunlight, water and carbon dioxide."], ["Chloroplast", "This happens in the green chloroplasts."]], "Right! Chloroplasts make food."],
+      ["Cells", "What does the nucleus of a cell do?", ["Controls the cell and holds its DNA", "Makes food from light", "Lets water in and out", "Gives the cell its green color"],
+        "It's like the control center.", "It stores the cell's instructions.", "Where is DNA kept in animal and plant cells?",
+        [["Control center", "The nucleus directs what the cell does."], ["DNA", "It holds DNA, the cell's instructions."]], "Yes! The nucleus controls the cell."],
+      ["Cells", "Which is found in plant cells but not animal cells?", ["A cell wall", "A nucleus", "A cell membrane", "Cytoplasm"],
+        "Plants stand up stiffly without bones.", "This tough outer layer gives support.", "What makes plant cells stiff?",
+        [["Both have", "Plant and animal cells both have a nucleus, membrane and cytoplasm."], ["Plants only", "Plant cells also have a stiff cell wall."]], "Right! Cell walls are in plant cells."],
+      ["Earth's layers and plates", "What is the outermost layer of Earth called?", ["The crust", "The core", "The mantle", "The magma"],
+        "It's the layer we live on.", "It's thin compared to the others, like the skin of an apple.", "What layer has land and ocean floor?",
+        [["Layers", "Earth has a crust, mantle, outer core and inner core."], ["Outside", "The crust is the thin outer layer."]], "Yes! The crust is the outer layer."],
+      ["Earth's layers and plates", "What causes most earthquakes?", ["Tectonic plates moving and slipping", "Heavy rain", "The Moon's light", "Animals digging"],
+        "Earth's crust is broken into huge pieces.", "These pieces grind and slip past each other.", "What are the giant moving pieces of crust called?",
+        [["Plates", "The crust is made of big tectonic plates."], ["Slipping", "When plates suddenly slip, the ground shakes."]], "Right! Moving plates cause most earthquakes."],
+      ["Earth's layers and plates", "Many volcanoes are found where?", ["Along the edges of tectonic plates", "In the middle of every desert", "Only at the North Pole", "Under every city"],
+        "Think of the 'Ring of Fire' around the Pacific Ocean.", "Magma rises where plates meet or pull apart.", "Where do plates meet?",
+        [["Plate edges", "Plates meet or pull apart at their edges."], ["Magma", "Magma can rise up there and form volcanoes."]], "Yes! Most volcanoes are at plate edges."],
+      ["Earth's layers and plates", "Africa and South America look like they could fit together like puzzle pieces. What explains this?", ["They were once joined and drifted apart", "Someone carved them", "It's just a coincidence", "Oceans shaped them that way last year"],
+        "Matching fossils are found on both coasts.", "Continents move very slowly over millions of years.", "What is the idea that continents move called?",
+        [["Clues", "Their coastlines match, and the same fossils are found on both."], ["Continental drift", "They were once joined and slowly drifted apart."]], "Right! They were once joined."],
+      ["Weather and the atmosphere", "What tool measures air pressure?", ["A barometer", "A thermometer", "A rain gauge", "An anemometer"],
+        "'Baro' means weight or pressure.", "Falling pressure often means a storm is coming.", "Which tool helps forecasters watch for storms?",
+        [["Air pressure", "Air pushes on everything. That push is air pressure."], ["Tool", "A barometer measures air pressure."]], "Yes! A barometer measures air pressure."],
+      ["Weather and the atmosphere", "Why does warm air rise?", ["It is less dense than cool air", "It is heavier", "It is pulled by the Moon", "Warm air is magnetic"],
+        "Warm air particles spread out.", "Spread-out air is lighter for its size.", "Why does a hot-air balloon float?",
+        [["Spreading out", "Heating makes air particles move faster and spread apart."], ["Less dense", "The warm air is less dense, so cooler air sinks and pushes it up."]], "Right! Warm air is less dense, so it rises."],
+      ["Weather and the atmosphere", "What usually happens when a cold front moves in?", ["Storms, then cooler weather", "It gets much hotter", "The air stops moving", "Snow turns to sand"],
+        "A cold front is cold air pushing into warm air.", "The warm air is forced up quickly, which forms storm clouds.", "What is the weather like after the front passes?",
+        [["Pushing warm air up", "Cold air shoves warm, moist air upward fast."], ["Result", "That can bring storms, and then cooler, drier weather."]], "Yes! Storms, then cooler weather."],
+      ["Weather and the atmosphere", "Which gas makes up most of the air we breathe?", ["Nitrogen", "Oxygen", "Carbon dioxide", "Helium"],
+        "It's not the one we need to breathe.", "About 78% of air is this gas.", "Which gas is most common in air?",
+        [["Air mix", "Air is a mix of gases."], ["Most of it", "About 78% is nitrogen and about 21% is oxygen."]], "Right! Most of the air is nitrogen."],
+      ["Heat and energy transfer", "A metal spoon in hot soup gets hot. How does the heat travel?", ["Conduction", "Convection", "Radiation", "Evaporation"],
+        "The heat moves through the spoon by touching.", "Heat passes from particle to particle in a solid.", "What's heat transfer by direct contact called?",
+        [["Touching", "The hot soup touches the spoon."], ["Conduction", "Heat moves through the metal particle by particle. That is conduction."]], "Yes! That's conduction."],
+      ["Heat and energy transfer", "How does the Sun's heat reach Earth through space?", ["Radiation", "Conduction", "Convection", "Wind"],
+        "Space is almost empty, so there's nothing to touch.", "This kind of heat travels as waves.", "How do you feel warmth from a campfire without touching it?",
+        [["Empty space", "Conduction and convection need matter."], ["Radiation", "The Sun's energy travels as waves through space. That is radiation."]], "Right! Radiation carries the Sun's heat."],
+      ["Heat and energy transfer", "Why do pots often have plastic or wooden handles?", ["Those materials are insulators and don't get hot fast", "They are shinier", "They conduct heat well", "They are magnetic"],
+        "Metal gets hot fast.", "Some materials slow down heat flow.", "What's a material called that slows heat?",
+        [["Conductors", "Metals let heat move through them quickly."], ["Insulators", "Plastic and wood slow heat down, so the handle stays cooler."]], "Yes! They're insulators."],
+      ["Heat and energy transfer", "In a pot of boiling water, hot water rises and cooler water sinks. What is this called?", ["Convection", "Conduction", "Radiation", "Reflection"],
+        "This happens in liquids and gases.", "It makes a loop, like a current.", "What is heat moving with flowing liquid or gas called?",
+        [["Moving liquid", "Warm water rises; cool water sinks."], ["Convection", "This circle of moving water carries heat. That's convection."]], "Right! That's convection."],
+    ],
+  };
+
+  function scienceQuestions(grade) {
+    return (SCIENCE[grade] || []).map((r, i) => {
+      const [skill, prompt, ch, h1, h2, nudge, steps, right] = r;
+      return { id: `s${grade}q${i + 1}`, skill, prompt, choices: ch.slice(), answerIndex: 0,
+        hints: [h1, h2], nudge, steps: steps.map(([title, detail]) => ({ title, detail })), rightFeedback: right };
+    });
+  }
+
   // ---------- remembering what this device has seen ----------
   const SEEN_KEY = "numbernest-seen-v1";
   function loadSeen() {
@@ -638,7 +960,20 @@
       let questions;
       let topic = deck.topic;
 
-      if (subject === "math" && MATH[grade]) {
+      if (subject === "science" && SCIENCE[grade]) {
+        // Up to 10 science questions: ones this device hasn't seen yet first, then the ones seen longest ago,
+        // in an order that never asks the same skill twice in a row.
+        topic = SCIENCE_TOPICS[grade];
+        const LEN = 10;
+        const pool = scienceQuestions(grade);
+        const unseen = shuffle(pool.filter((x) => !seenList.includes(x.id)));
+        const old = seenList.map((id) => pool.find((x) => x.id === id)).filter(Boolean);
+        const items = unseen.concat(old).slice(0, LEN);
+        const ok = (list) => list.every((x, i) => i === 0 || x.skill !== list[i - 1].skill);
+        questions = items;
+        for (let tries = 0; tries < 200 && !ok(questions); tries++) questions = shuffle(items);
+        seen[key] = seenList.filter((id) => !items.some((x) => x.id === id)).concat(items.map((x) => x.id));
+      } else if (subject === "math" && MATH[grade]) {
         topic = MATH_TOPICS[grade];
         // Up to 10 questions: every kind of problem twice with new numbers, in a mixed order,
         // never the same kind twice in a row. One may be swapped for a hand-written question.
@@ -722,7 +1057,7 @@
   }
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const subjName = (s) => (s === "reading" ? "Reading" : "Math");
+  const subjName = (s) => (s === "reading" ? "Reading" : s === "science" ? "Science" : "Math");
   const RESULT_LABEL = { first: "Right on the first try", helped: "Right with a hint", shown: "Needed the full solution" };
 
   function css() {
@@ -812,6 +1147,8 @@
   }
 
   function newRound() { window.location.reload(); }
+  // Close the completed screen if the app moves to another page (for example with the back button).
+  window.addEventListener("hashchange", () => { const el = document.getElementById("nn-done"); if (el) el.remove(); });
   const TOP_GRADE = 6;
   // Start a fresh round of the given subject and grade (the app keeps them in the #/tutor link).
   function playGrade(subject, grade) {
@@ -978,7 +1315,7 @@
       };
     }
     const groups = [];
-    for (const [subject, label] of [["math", "Math"], ["reading", "Reading"]]) {
+    for (const [subject, label] of [["math", "Math"], ["reading", "Reading"], ["science", "Science"]]) {
       const map = {};
       for (const h of week.filter((x) => x.subject === subject)) {
         for (const k of h.skills || []) {
@@ -1018,5 +1355,7 @@
     _math: MATH,
     _reading: READING,
     _readingQuestions: readingQuestions,
+    _science: SCIENCE,
+    _scienceQuestions: scienceQuestions,
   };
 })();
