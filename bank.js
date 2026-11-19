@@ -21,18 +21,34 @@
   const dec = (n) => String(Math.round(n * 100) / 100);
   let counter = 0;
 
+  // The number a choice stands for ("$0.30", "3/10", "30%" and "0.3" are all 0.3), or null for words.
+  function valueOf(choice) {
+    const s = String(choice).replace(/\s*\(.*\)$/, "").replace(/^\$/, "").replace(/,/g, "").trim();
+    let m;
+    if ((m = s.match(/^(-?\d+)\/(\d+)$/))) return Number(m[1]) / Number(m[2]);
+    if ((m = s.match(/^(-?\d+(?:\.\d+)?)%$/))) return Number(m[1]) / 100;
+    return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : null;
+  }
+  // Two choices clash if they are the same text, or the same kind of number with the same value
+  // (like "8" and "8.0"), so only one choice can ever be right.
+  function clashes(list, s) {
+    const v = valueOf(s);
+    const kind = (x) => (/%$/.test(x) ? "%" : /\//.test(x) ? "/" : /^\$/.test(x) ? "$" : "n");
+    return list.some((x) => x === s || (v !== null && kind(x) === kind(s) && valueOf(x) !== null && Math.abs(valueOf(x) - v) < 1e-9));
+  }
+
   // Build four unique choices: the right answer plus plausible mistakes.
   function choices(right, wrongs, fill) {
     const out = [String(right)];
     for (const w of wrongs) {
       const s = String(w);
-      if (!out.includes(s) && s !== "NaN" && s !== "undefined") out.push(s);
+      if (!clashes(out, s) && s !== "NaN" && s !== "undefined") out.push(s);
       if (out.length === 4) break;
     }
     let k = 1;
     while (out.length < 4 && k < 50) {
       const s = String(fill(k++));
-      if (!out.includes(s)) out.push(s);
+      if (!clashes(out, s)) out.push(s);
     }
     return out;
   }
@@ -50,6 +66,7 @@
         nudge,
         steps: steps.map(([title, detail]) => ({ title, detail })),
         rightFeedback,
+        component: COMPONENT_OF[skill],
       },
       extra || {},
     );
@@ -363,13 +380,514 @@
     ],
   };
 
+  // ---------- decimals and percents (Illinois Learning Standards: 4.NF.5-7, 5.NBT.1/3/4/7, 6.RP.3c, 6.NS.3) ----------
+  // Numbers are kept as whole hundredths (or cents) while computing, so rounding errors never creep in.
+  const hund = (h) => (h / 100).toFixed(2).replace(/\.?0+$/, "") || "0"; // 340 -> "3.4", 300 -> "3", 5 -> "0.05"
+  const hund2 = (h) => (h / 100).toFixed(2); // always two places: 340 -> "3.40"
+  const cents = (c) => money(c / 100);
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const PLACE = ["ones", "tenths", "hundredths", "thousandths"];
+
+  // A 10 × 10 grid (shown by the app's fraction picture, laid out as a square by gridCss below).
+  const grid = (shaded, tone, label) => ({ visuals: [{ label, numerator: shaded, denominator: 100, tone }] });
+
+  const NEW_MATH = {
+    4: [
+      function tenthsHundredths() {
+        const kind = rnd(0, 3);
+        if (kind === 0) {
+          const n = rnd(1, 9);
+          return q("Tenths and hundredths", `Write ${n}/10 as a decimal.`, `0.${n}`, [`0.0${n}`, `${n}.0`, `1.${n}`], (k) => `0.${(n + k) % 10 || 1}${k}`,
+            [`${n}/10 means ${n} tenths.`, `The first place after the decimal point is the tenths place.`],
+            `You're close. Tenths go in the first place right after the point.`,
+            [["Read the fraction", `${n}/10 is ${n} tenths.`], ["Use the tenths place", `Put the ${n} just after the point.`], ["Answer", `${n}/10 = 0.${n}.`]],
+            `Yes! ${n}/10 = 0.${n}.`);
+        }
+        if (kind === 1) {
+          let n = rnd(11, 99);
+          if (n % 10 === 0) n += 1;
+          const rev = Number(String(n).split("").reverse().join(""));
+          return q("Tenths and hundredths", `Write ${n}/100 as a decimal.`, `0.${n}`, [`${n / 10}`, `0.0${n}`, `${n}.0`, `0.${pad2(rev)}`], (k) => `0.${pad2((n + k) % 100)}`,
+            [`${n}/100 means ${n} hundredths.`, `Hundredths need two places after the decimal point.`],
+            `You're close. Hundredths fill the first two places after the point.`,
+            [["Read the fraction", `${n}/100 is ${n} hundredths.`], ["Use two places", `${n} hundredths is written 0.${n}.`], ["Answer", `${n}/100 = 0.${n}.`]],
+            `Yes! ${n}/100 = 0.${n}.`);
+        }
+        if (kind === 2) {
+          let n = rnd(11, 99);
+          if (n % 10 === 0) n += 1;
+          return q("Tenths and hundredths", `Which fraction is the same as 0.${n}?`, `${n}/100`, [`${n}/10`, `${n}/1000`, `${100 - n}/100`], (k) => `${n + k}/100`,
+            [`How many places come after the decimal point in 0.${n}?`, `Two places means hundredths. So 0.${n} is ${n} of what?`],
+            `You're close. Two places after the point means hundredths.`,
+            [["Count the places", `0.${n} has two places after the point.`], ["Name them", `Two places means hundredths: ${n} hundredths.`], ["Answer", `0.${n} = ${n}/100.`]],
+            `Yes! 0.${n} = ${n}/100.`);
+        }
+        const n = rnd(1, 9);
+        return q("Tenths and hundredths", `${n}/10 is the same as how many hundredths?`, `${n * 10}/100`, [`${n}/100`, `${n + 10}/100`, `${n * 100}/100`], (k) => `${n * 10 + k}/100`,
+          [`Each tenth can be cut into 10 hundredths.`, `${n} tenths × 10 = how many hundredths?`],
+          `You're close. One tenth is the same as ten hundredths.`,
+          [["One tenth", `1/10 = 10/100.`], ["Scale up", `${n} tenths = ${n} × 10 = ${n * 10} hundredths.`], ["Answer", `${n}/10 = ${n * 10}/100.`]],
+          `Yes! ${n}/10 = ${n * 10}/100, which is also 0.${n}.`);
+      },
+      function compareDecimals() {
+        const kind = rnd(0, 2);
+        let a, b; // in hundredths
+        if (kind === 0) { const t = rnd(2, 9); a = t * 10; b = (t - 1) * 10 + rnd(1, 9); } // 0.6 vs 0.57: the classic trap
+        else if (kind === 1) { a = rnd(11, 89); if (a % 10 === 0) a += 1; b = Number(String(a).split("").reverse().join("")); if (b === a || b % 10 === 0) b = a + 10; }
+        else { a = rnd(1, 9) * 10; b = a; }
+        const show = (h, two) => (two ? `0.${pad2(h)}` : `0.${h / 10}`);
+        const A = show(a, kind === 1), B = kind === 2 ? `0.${pad2(b)}` : show(b, true);
+        const [x, y] = Math.random() < 0.5 ? [A, B] : [B, A];
+        const right = a === b ? "They are equal" : `${a > b ? A : B} is greater`;
+        return q("Comparing decimals", `Which is greater: ${x} or ${y}?`, right, [`${x} is greater`, `${y} is greater`, "They are equal", "You can't tell"], () => "You can't tell",
+          [`Give both numbers two places after the point, so you compare hundredths with hundredths.`, `Now compare them as hundredths: ${a} hundredths and ${b} hundredths.`],
+          `Not quite. More digits doesn't mean bigger. Compare tenths first, then hundredths.`,
+          [["Same number of places", `${A} = 0.${pad2(a)} and ${B} = 0.${pad2(b)}.`], ["Compare hundredths", `${a} hundredths and ${b} hundredths.`], ["Answer", a === b ? `They are equal.` : `${right}.`]],
+          a === b ? `Yes! ${A} and ${B} are the same amount.` : `Yes! ${right}.`);
+      },
+      function decimalGrid() {
+        if (Math.random() < 0.5) {
+          let k = rnd(5, 95);
+          if (k % 10 === 0 || k === 50) k += 3;
+          const ask = Math.random() < 0.7 ? "shaded" : "not shaded";
+          const ans = ask === "shaded" ? k : 100 - k, other = 100 - ans;
+          return q("Decimal grid model", `${k} of the 100 small squares are shaded. What decimal names the part that is ${ask}?`, `0.${pad2(ans)}`,
+            [`0.${pad2(other)}`, `${ans}`, `${ans / 10}`, `0.0${ans}`], (j) => `0.${pad2((ans + j) % 100)}`,
+            [`Each small square is 1 hundredth of the whole.`, ask === "shaded" ? `${k} squares are shaded. That is ${k} hundredths.` : `100 − ${k} squares are not shaded.`],
+            `You're close. Count hundredths, and write them with two places after the point.`,
+            [["One square", `Each square is 1/100 of the whole.`], ["Count", `${ans} squares are ${ask}: ${ans}/100.`], ["Answer", `${ans}/100 = 0.${pad2(ans)}.`]],
+            `Yes! ${ans} hundredths = 0.${pad2(ans)}.`, grid(k, "sky", "1 whole = 100 squares"));
+        }
+        const d = rnd(1, 7), p = rnd(1, 9), c = d * 10 + p, n = pick(NAMES);
+        return q("Decimal grid model", `${n} has ${d} dime${d === 1 ? "" : "s"} and ${p} penn${p === 1 ? "y" : "ies"}. What part of a dollar is that?`, `$0.${pad2(c)}`,
+          [`$${c}.00`, `$0.${pad2(d + p)}`, `$${d}.${p}0`, `$0.0${c}`], (j) => `$0.${pad2(c + j)}`,
+          [`A dime is 10 cents (1/10 of a dollar). A penny is 1 cent (1/100 of a dollar).`, `${d} dimes = ${d * 10} cents. Add the ${p} pennies.`],
+          `You're close. Dimes are tenths of a dollar and pennies are hundredths.`,
+          [["Dimes", `${d} dime${d === 1 ? "" : "s"} = ${d} tenths = ${d * 10} cents.`], ["Pennies", `${p} penn${p === 1 ? "y" : "ies"} = ${p} cents. Total ${c} cents.`], ["Answer", `${c} cents = ${c}/100 of a dollar = $0.${pad2(c)}.`]],
+          `Yes! ${c} cents is $0.${pad2(c)}, which is ${c}/100 of a dollar.`, grid(c, "grape", "$1.00 = 100 pennies"));
+      },
+    ],
+    5: [
+      function decimalPlaceValue() {
+        const digits = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, 4);
+        const [o, t, h, th] = digits;
+        const three = Math.random() < 0.5;
+        const num = three ? `${o}.${t}${h}${th}` : `${o}.${t}${h}`;
+        const place = rnd(0, three ? 3 : 2);
+        const dgt = digits[place];
+        const vals = [`${dgt}`, `0.${dgt}`, `0.0${dgt}`, `0.00${dgt}`, `${dgt}0`];
+        return q("Decimal place value", `In ${num}, what is the value of the digit ${dgt}?`, `${vals[place]} (${dgt} ${PLACE[place]})`,
+          [0, 1, 2, 3].filter((p) => p !== place).map((p) => `${vals[p]} (${dgt} ${PLACE[p]})`), () => `${vals[4]} (${dgt} tens)`,
+          [`Find the ${dgt}. Is it before or after the decimal point?`, `After the point the places go tenths, hundredths, thousandths.`],
+          `You're close. Count the places from the decimal point.`,
+          [["Find the digit", `The ${dgt} in ${num}.`], ["Name its place", `It is in the ${PLACE[place]} place.`], ["Answer", `Its value is ${vals[place]}.`]],
+          `Yes! The ${dgt} is in the ${PLACE[place]} place, so it is worth ${vals[place]}.`);
+      },
+      function roundDecimals() {
+        let n = rnd(101, 999);
+        if (n % 10 === 0) n += 7;
+        const x = hund2(n);
+        if (Math.random() < 0.6) {
+          const lo = Math.floor(n / 10), r = Math.round(n / 10), other = r === lo ? lo + 1 : lo;
+          return q("Rounding decimals", `Round ${x} to the nearest tenth.`, (r / 10).toFixed(1),
+            [(other / 10).toFixed(1), ((r + 10) / 10).toFixed(1), (r % 10 ? String(Math.round(n / 100)) : ((r + 20) / 10).toFixed(1))], (k) => ((r + k + 1) / 10).toFixed(1),
+            [`${x} is between ${(lo / 10).toFixed(1)} and ${((lo + 1) / 10).toFixed(1)}.`, `Look at the hundredths digit, ${n % 10}. Is it 5 or more?`],
+            `You're close. 5 or more in the hundredths place rounds up; 4 or less rounds down.`,
+            [["Find the two tenths", `${x} is between ${(lo / 10).toFixed(1)} and ${((lo + 1) / 10).toFixed(1)}.`], ["Check the next digit", `The hundredths digit is ${n % 10}, so round ${n % 10 >= 5 ? "up" : "down"}.`], ["Answer", `${(r / 10).toFixed(1)}.`]],
+            `Yes! ${x} rounds to ${(r / 10).toFixed(1)}.`);
+        }
+        const lo = Math.floor(n / 100), r = Math.round(n / 100), other = r === lo ? lo + 1 : lo;
+        return q("Rounding decimals", `Round ${x} to the nearest whole number.`, String(r),
+          [String(other), (Math.round(n / 10) / 10).toFixed(1), String(r + 10)], (k) => String(r + k + 1),
+          [`${x} is between ${lo} and ${lo + 1}.`, `Look at the tenths digit, ${Math.floor(n / 10) % 10}. Is it 5 or more?`],
+          `You're close. Look at the tenths digit to decide.`,
+          [["Find the two whole numbers", `${x} is between ${lo} and ${lo + 1}.`], ["Check the tenths", `The tenths digit is ${Math.floor(n / 10) % 10}, so round ${Math.floor(n / 10) % 10 >= 5 ? "up" : "down"}.`], ["Answer", `${r}.`]],
+          `Yes! ${x} rounds to ${r}.`);
+      },
+      function subtractDecimals() {
+        const tenthsOnly = Math.random() < 0.5;
+        let a = tenthsOnly ? rnd(31, 99) * 10 : rnd(301, 999), b = rnd(105, a - 110);
+        if (b % 10 === 0) b += 3;
+        if (b >= a) b = a - 101;
+        const d = a - b, A = tenthsOnly ? hund(a) : hund2(a);
+        const misaligned = tenthsOnly ? Math.abs(Math.floor(a / 100) * 100 + (a % 100) / 10 - b) : null;
+        return q("Subtracting decimals", `What is ${A} − ${hund2(b)}?`, hund2(d),
+          [hund2(d + 10), hund2(d - 100), hund2(d + 100), misaligned !== null ? hund2(misaligned) : hund2(d - 10)], (k) => hund2(d + k),
+          [`Line up the decimal points. ${tenthsOnly ? `Write ${A} as ${hund2(a)} so both have hundredths.` : "Both numbers have hundredths."}`, `Subtract the hundredths, then tenths, then ones. Borrow when the top digit is smaller.`],
+          `You're close. Keep the points lined up and borrow when you need to.`,
+          [["Line them up", `${hund2(a)} − ${hund2(b)}, points in a column.`], ["Subtract each column", `Hundredths, tenths, then ones, borrowing as needed.`], ["Answer", `${hund2(d)}.`]],
+          `Yes! ${A} − ${hund2(b)} = ${hund2(d)}.`);
+      },
+      function decimalTimesWhole() {
+        const w = rnd(2, 9);
+        const h = Math.random() < 0.5 ? rnd(2, 9) * 10 : rnd(105, 495); // 0.6 or 1.25 (in hundredths)
+        const p = h * w;
+        const x = hund(h);
+        return q("Multiplying a decimal by a whole number", `What is ${x} × ${w}?`, hund(p),
+          [hund(p * 10), hund(p / 10), hund(h + w * 100), hund(p + 10)], (k) => hund(p + 100 * k),
+          [`${x} × ${w} means ${w} groups of ${x}.`, `Multiply as if there were no point (${h % 10 === 0 ? h / 10 : h} × ${w}), then put the point back.`],
+          `You're close. Estimate first: ${x} × ${w} should be close to ${Math.round(h / 100) * w}.`,
+          [["Multiply whole numbers", `${h % 10 === 0 ? h / 10 : h} × ${w} = ${h % 10 === 0 ? (h / 10) * w : p}.`], ["Place the point", `${x} has ${h % 10 === 0 ? 1 : 2} decimal place${h % 10 === 0 ? "" : "s"}, so the answer does too.`], ["Answer", `${x} × ${w} = ${hund(p)}.`]],
+          `Yes! ${x} × ${w} = ${hund(p)}.`);
+      },
+      function decimalMoneyWord() {
+        const n = pick(NAMES), [i1, i2] = shuffle([["a notebook", 0], ["a pen", 0], ["a snack", 0], ["a bookmark", 0], ["a juice box", 0], ["a pack of stickers", 0]]).slice(0, 2).map((x) => x[0]);
+        const c1 = rnd(105, 395), c2 = rnd(105, 395), total = c1 + c2, paid = total <= 400 ? 500 : 1000, change = paid - total;
+        if (Math.random() < 0.4) {
+          return q("Decimal word problems with money", `${n} buys ${i1} for ${cents(c1)} and ${i2} for ${cents(c2)}. How much does ${n} spend in all?`, cents(total),
+            [cents(total + 100), cents(total - 10), cents(Math.abs(c1 - c2)), cents(total + 10)], (k) => cents(total + k),
+            [`"In all" means add.`, `Line up the decimal points: ${cents(c1)} + ${cents(c2)}.`],
+            `You're close. Line up the points and carry when a column makes 10 or more.`,
+            [["Add", `${cents(c1)} + ${cents(c2)}.`], ["Line up and carry", `Cents first, then dollars.`], ["Answer", `${cents(total)}.`]],
+            `Yes! ${n} spends ${cents(total)}.`);
+        }
+        return q("Decimal word problems with money", `${n} buys ${i1} for ${cents(c1)} and ${i2} for ${cents(c2)}, and pays with ${cents(paid)}. How much change does ${n} get?`, cents(change),
+          [cents(total), cents(change + 100), cents(change - 10), cents(change + 10)], (k) => cents(change + k),
+          [`First find the total cost: ${cents(c1)} + ${cents(c2)}.`, `Then subtract the total from ${cents(paid)}.`],
+          `You're close. Find the total first, then take it away from what ${n} paid.`,
+          [["Total cost", `${cents(c1)} + ${cents(c2)} = ${cents(total)}.`], ["Subtract", `${cents(paid)} − ${cents(total)}.`], ["Answer", `${cents(change)} in change.`]],
+          `Yes! ${n} gets ${cents(change)} back.`);
+      },
+    ],
+    6: [
+      function percentFractionDecimal() {
+        const TABLE = [[10, "1/10", "0.1"], [20, "1/5", "0.2"], [25, "1/4", "0.25"], [30, "3/10", "0.3"], [40, "2/5", "0.4"], [50, "1/2", "0.5"],
+          [60, "3/5", "0.6"], [70, "7/10", "0.7"], [75, "3/4", "0.75"], [80, "4/5", "0.8"], [5, "1/20", "0.05"], [90, "9/10", "0.9"],
+          [15, "3/20", "0.15"], [35, "7/20", "0.35"], [45, "9/20", "0.45"], [4, "1/25", "0.04"]];
+        const [p, f, d] = pick(TABLE);
+        const others = shuffle(TABLE.filter((r) => r[0] !== p));
+        const kind = rnd(0, 2);
+        if (kind === 0) {
+          return q("Percents, fractions and decimals", `Write ${p}% as a fraction in simplest form.`, f, [`1/${p}`, `${p}/10`, others[0][1], others[1][1]], (k) => others[k + 1][1],
+            [`Percent means "out of 100." So ${p}% = ${p}/100.`, `Simplify ${p}/100 by dividing the top and bottom by the same number (${gcd(p, 100)}).`],
+            `You're close. Start with ${p}/100, then simplify.`,
+            [["Write it out of 100", `${p}% = ${p}/100.`], ["Simplify", `Divide top and bottom by ${gcd(p, 100)}.`], ["Answer", `${p}% = ${f} = ${d}.`]],
+            `Yes! ${p}% = ${f}, and that's ${d} as a decimal.`);
+        }
+        if (kind === 1) {
+          return q("Percents, fractions and decimals", `Write ${p}% as a decimal.`, d, [`${p}`, `0.0${p}`, `${p / 10}`, others[0][2]], (k) => others[k][2],
+            [`${p}% means ${p} hundredths.`, `${p} hundredths has two places after the point.`],
+            `You're close. Divide the percent by 100: move the point two places left.`,
+            [["Out of 100", `${p}% = ${p}/100.`], ["As hundredths", `${p} hundredths.`], ["Answer", `${p}% = ${d}.`]],
+            `Yes! ${p}% = ${d}.`);
+        }
+        const [n, den] = f.split("/").map(Number);
+        return q("Percents, fractions and decimals", `Write ${f} as a percent.`, `${p}%`, [`${n}${den}%`, `${n}%`, `${others[0][0]}%`, `${others[1][0]}%`], (k) => `${others[k + 1][0]}%`,
+          [`A percent is a fraction out of 100.`, `What do you multiply ${den} by to get 100? Do the same to ${n}.`],
+          `You're close. Make an equal fraction with 100 on the bottom.`,
+          [["Get 100 on the bottom", `${den} × ${100 / den} = 100.`], ["Scale the top", `${n} × ${100 / den} = ${p}.`], ["Answer", `${f} = ${p}/100 = ${p}%.`]],
+          `Yes! ${f} = ${p}%.`);
+      },
+      function findTheWhole() {
+        const p = pick([10, 20, 25, 40, 50, 75]), w = pick([20, 40, 60, 80, 100, 120, 160, 200]), part = (p * w) / 100;
+        const unit = 100 / gcd(p, 100), units = p / gcd(p, 100); // p% = units/unit
+        const story = Math.random() < 0.5;
+        const n = pick(NAMES);
+        const prompt = story
+          ? `${n} has read ${part} pages of a book. That is ${p}% of the book. How many pages does the book have?`
+          : `${part} is ${p}% of what number?`;
+        return q("Finding the whole from a percent", prompt, w, [(part * p) / 100, part + p, part * p, w / 2 === part ? w * 2 : w / 2].map(dec), (k) => w + 10 * k,
+          [`${p}% is ${units}/${unit} of the whole.`, `If ${units} part${units === 1 ? "" : "s"} out of ${unit} ${units === 1 ? "is" : "are"} ${part}, one part is ${part / units}.`],
+          `You're close. The whole is bigger than the part, since ${p}% is less than 100%.`,
+          [["Write the percent as a fraction", `${p}% = ${units}/${unit}.`], ["Find one part", `${part} ÷ ${units} = ${part / units}.`], ["Find the whole", `${part / units} × ${unit} = ${w}.`]],
+          `Yes! ${part} is ${p}% of ${w}.`);
+      },
+      function saleAndTip() {
+        if (Math.random() < 0.5) {
+          const p = pick([10, 20, 25, 30, 40, 50]), P = pick([20, 30, 40, 50, 60, 80, 100]), off = P * p, sale = P * 100 - off; // in cents
+          const item = pick(["jacket", "skateboard", "board game", "pair of sneakers", "backpack"]);
+          return q("Sale prices and tips", `A ${item} costs ${money(P)}. It is on sale for ${p}% off. What is the sale price?`, cents(sale),
+            [cents(off), cents(P * 100 + off), P > p ? money(P - p) : cents(sale + 200), cents(sale + 500)], (k) => cents(sale - 100 * k),
+            [`First find ${p}% of ${money(P)}. That's how much you save.`, `${p}% of ${money(P)} is ${cents(off)}. Subtract it from the price.`],
+            `You're close. Find the discount, then take it away from the price.`,
+            [["Find the discount", `${p}% of ${money(P)} = ${cents(off)}.`], ["Subtract", `${money(P)} − ${cents(off)}.`], ["Answer", `${cents(sale)}.`]],
+            `Yes! The sale price is ${cents(sale)}.`);
+        }
+        const p = pick([10, 15, 20]), bill = pick([20, 24, 30, 36, 40, 48, 50, 60]), tip = bill * p; // cents
+        const askTotal = Math.random() < 0.5;
+        const right = askTotal ? bill * 100 + tip : tip;
+        return q("Sale prices and tips", `A family's dinner costs ${money(bill)}. They leave a ${p}% tip. ${askTotal ? "What is the total with the tip?" : "How much is the tip?"}`, cents(right),
+          askTotal ? [cents(tip), money(bill + p), cents(bill * 100 - tip), cents(right + 100)] : [money(p), cents(tip * 10), cents(bill * 100 + tip), cents(tip + 100)],
+          (k) => cents(right + 50 * k),
+          [`Find 10% first: 10% of ${money(bill)} is ${money(bill / 10)}.`, p === 10 ? `So the tip is 10%.` : p === 20 ? `20% is double 10%.` : `15% is 10% plus half of 10%.`],
+          `You're close. ${askTotal ? "Find the tip, then add it to the bill." : "The tip is a part of the bill, so it's less than the bill."}`,
+          [["Find 10%", `10% of ${money(bill)} = ${money(bill / 10)}.`], [`Build ${p}%`, `${p}% of ${money(bill)} = ${cents(tip)}.`], ["Answer", askTotal ? `${money(bill)} + ${cents(tip)} = ${cents(right)}.` : `The tip is ${cents(tip)}.`]],
+          `Yes! ${askTotal ? `The total is ${cents(right)}.` : `The tip is ${cents(tip)}.`}`);
+      },
+      function divideDecimals() {
+        if (Math.random() < 0.5) {
+          const qt = rnd(2, 12), d = rnd(2, 9), D = qt * d; // D tenths ÷ d tenths
+          return q("Dividing decimals", `What is ${hund(D * 10)} ÷ ${hund(d * 10)}?`, String(qt),
+            [hund(qt * 10), hund(qt * 100), String(qt + 1), hund((D * d) / 10)], (k) => String(qt + 1 + k),
+            [`Multiply both numbers by 10 so you divide by a whole number.`, `${hund(D * 10)} ÷ ${hund(d * 10)} is the same as ${D} ÷ ${d}.`],
+            `You're close. Dividing by a number less than 1 gives a bigger answer.`,
+            [["Make the divisor whole", `Multiply both by 10: ${D} ÷ ${d}.`], ["Divide", `${D} ÷ ${d} = ${qt}.`], ["Answer", `${hund(D * 10)} ÷ ${hund(d * 10)} = ${qt}.`]],
+            `Yes! ${hund(D * 10)} ÷ ${hund(d * 10)} = ${qt}.`);
+        }
+        let t = rnd(11, 99);
+        if (t % 10 === 0) t += 1;
+        const d = rnd(2, 9), D = t * d; // D tenths ÷ d = t tenths
+        return q("Dividing decimals", `What is ${hund(D * 10)} ÷ ${d}?`, hund(t * 10),
+          [hund(t * 100), hund(t), hund(t * 10 + 10), String(D)], (k) => hund(t * 10 + 100 * k),
+          [`Divide as if there were no decimal point: ${D} ÷ ${d}.`, `${D} ÷ ${d} = ${t}. The answer has the same number of decimal places as ${hund(D * 10)}.`],
+          `You're close. Estimate: ${hund(D * 10)} ÷ ${d} is about ${Math.round(D / 10 / d)}.`,
+          [["Divide the digits", `${D} ÷ ${d} = ${t}.`], ["Place the point", `${hund(D * 10)} has one decimal place, so the answer is ${hund(t * 10)}.`], ["Answer", `${hund(t * 10)}.`]],
+          `Yes! ${hund(D * 10)} ÷ ${d} = ${hund(t * 10)}.`);
+      },
+    ],
+  };
+
+  // ---------- adaptive reasoning and discourse ----------
+  // "Spot the mistake": a worked answer with exactly one wrong step. The work is shown in the
+  // "read this first" box, one step per line.
+  function spotMistake(who, task, work, bad, fix, hint2, correct) {
+    const labels = work.map((s, i) => `Step ${i + 1}`);
+    return q("Spot the mistake", `Spot the mistake! ${who} worked out ${task}. Which step is the first one that's wrong?`, labels[bad],
+      labels.filter((l, i) => i !== bad).concat(["Every step is right"]), () => "Every step is right",
+      [`Check one step at a time, starting with Step 1. Stop at the first step that isn't right.`, hint2],
+      `Look again. Try that step yourself. Do you get the same thing ${who} got?`,
+      [["Check each step", `Redo each step and compare.`], [`Step ${bad + 1} is wrong`, fix], ["Fixed answer", correct]],
+      `Great detective work! Step ${bad + 1} was wrong: ${fix}`,
+      { passage: `${who}'s work on ${task}:\n` + work.map((s, i) => `Step ${i + 1}: ${s}`).join("\n") });
+  }
+
+  // "Which explanation is right?": four explanations, exactly one correct.
+  function explain(prompt, right, wrongs, hint2, answer) {
+    return q("Which explanation is right?", `${prompt} Which explanation is right?`, right, wrongs, () => "None of these",
+      [`Read each explanation. Is every part of it true?`, hint2],
+      `That explanation has a mistake in it. Which part isn't true?`,
+      [["Think it through", hint2], ["The right explanation", right], ["Answer", answer]],
+      `Yes! That's a clear explanation. ${answer}`);
+  }
+
+  const FRACTION_NAME = { 5: "fifths", 6: "sixths", 8: "eighths", 10: "tenths", 12: "twelfths" };
+  const REASONING = {
+    4: [
+      function spotMistake4() {
+        const who = pick(NAMES), kind = rnd(0, 2);
+        if (kind === 0) {
+          const t = rnd(2, 9), h = (t - 1) * 10 + rnd(1, 9), A = `0.${t}`, B = `0.${pad2(h)}`;
+          if (Math.random() < 0.5) {
+            return spotMistake(who, `which is greater, ${A} or ${B}`,
+              [`Write ${A} as 0.0${t} so both have two places.`, `Compare: ${t} hundredths is less than ${h} hundredths.`, `So ${B} is greater.`], 0,
+              `${A} is the same as 0.${t}0, not 0.0${t}.`, `Is ${A} really the same as 0.0${t}?`, `0.${t}0 is ${t * 10} hundredths, which is more than ${h}. ${A} is greater.`);
+          }
+          return spotMistake(who, `which is greater, ${A} or ${B}`,
+            [`Write ${A} as 0.${t}0 so both have two places.`, `Compare ${t * 10} hundredths and ${h} hundredths.`, `${h} is more than ${t * 10}, so ${B} is greater.`], 2,
+            `${t * 10} is more than ${h}, so ${A} is greater.`, `Which is bigger, ${t * 10} or ${h}?`, `${A} is greater.`);
+        }
+        if (kind === 1) {
+          const a = rnd(12, 89), b = rnd(3, 9), t = Math.floor(a / 10) * 10, o = a % 10 || 1, A = t + o;
+          const p1 = t * b, p2 = o * b, bad = rnd(0, 2);
+          const P1 = bad === 0 ? p1 + 10 : p1, P2 = bad === 1 ? p2 + 1 : p2, S = bad === 2 ? P1 + P2 + 10 : P1 + P2;
+          const fixes = [`${t} × ${b} is ${p1}, not ${P1}.`, `${o} × ${b} is ${p2}, not ${P2}.`, `${P1} + ${P2} is ${P1 + P2}, not ${S}.`];
+          return spotMistake(who, `${A} × ${b}`, [`${t} × ${b} = ${P1}`, `${o} × ${b} = ${P2}`, `${P1} + ${P2} = ${S}`], bad, fixes[bad],
+            `Break ${A} into ${t} and ${o}. Check each multiplication, then the adding.`, `${A} × ${b} = ${A * b}.`);
+        }
+        const d = pick([5, 6, 8, 10, 12]), a = rnd(1, d - 2), b = rnd(1, d - 1 - a);
+        if (Math.random() < 0.5) {
+          return spotMistake(who, `${a}/${d} + ${b}/${d}`, [`Both fractions are ${FRACTION_NAME[d]}, the same size pieces.`, `Add the tops: ${a} + ${b} = ${a + b}.`, `Add the bottoms too: ${d} + ${d} = ${2 * d}, so the answer is ${a + b}/${2 * d}.`], 2,
+            `The bottom stays ${d}. The pieces are still ${FRACTION_NAME[d]}.`, `When you add ${FRACTION_NAME[d]} to ${FRACTION_NAME[d]}, does the size of the pieces change?`, `${a}/${d} + ${b}/${d} = ${a + b}/${d}.`);
+        }
+        return spotMistake(who, `${a}/${d} + ${b}/${d}`, [`Both fractions are ${FRACTION_NAME[d]}, the same size pieces.`, `Add the tops: ${a} + ${b} = ${a + b + 1}.`, `So the answer is ${a + b + 1}/${d}.`], 1,
+          `${a} + ${b} is ${a + b}, not ${a + b + 1}.`, `Check the adding in each step.`, `${a}/${d} + ${b}/${d} = ${a + b}/${d}.`);
+      },
+      function explain4() {
+        const kind = rnd(0, 2);
+        if (kind === 0) {
+          const t = rnd(2, 9), h = (t - 1) * 10 + rnd(1, 9), A = `0.${t}`, B = `0.${pad2(h)}`;
+          return explain(`Which is greater, ${A} or ${B}?`, `${A} is greater. ${A} is the same as 0.${t}0, and ${t * 10} hundredths is more than ${h} hundredths.`,
+            [`${B} is greater because ${h} is more than ${t}.`, `${B} is greater because it has more digits.`, `They are equal because they both start with 0.`],
+            `Write both numbers with two places after the point.`, `${A} is greater than ${B}.`);
+        }
+        if (kind === 1) {
+          const n = rnd(2, 9);
+          return explain(`Why is ${n}/10 the same as 0.${n}?`, `Both mean ${n} tenths: ${n} out of 10 equal parts.`,
+            [`Because ${n}/10 means ${n} out of 100 equal parts.`, `Because you turn the 10 into a decimal point.`, `Because ${n} + 10 = ${n + 10}, and you drop the 1.`],
+            `What does the first place after the point stand for?`, `${n}/10 = 0.${n}, ${n} tenths.`);
+        }
+        const n = rnd(2, 9);
+        return explain(`Why are ${n} dimes worth $0.${n}0?`, `A dime is 1 tenth of a dollar, so ${n} dimes is ${n} tenths of a dollar.`,
+          [`A dime is 1 cent, so ${n} dimes is $0.0${n}.`, `A dime is 10 dollars, so ${n} dimes is $${n * 10}.00.`, `You add the coins and the 10: ${n} + 10 = ${n + 10} cents.`],
+          `How many dimes make one dollar?`, `${n} dimes = $0.${n}0.`);
+      },
+    ],
+    5: [
+      function spotMistake5() {
+        const who = pick(NAMES), kind = rnd(0, 2);
+        if (kind === 0) {
+          const A = rnd(11, 89) * 10, B = rnd(101, 899) + (rnd(0, 1) ? 0 : 0);
+          const b = B % 10 === 0 ? B + 3 : B;
+          const wa = Math.floor(A / 100), wb = Math.floor(b / 100), fa = A % 100, fb = b % 100;
+          if (wa < 1 || fa === 0) return spotMistake5();
+          const bad = rnd(0, 2);
+          const FA = bad === 0 ? fa / 10 : fa;
+          const fs = FA + fb, FS = bad === 1 ? (fs >= 100 ? fs - 100 : fs + 10) : fs;
+          const tot = wa + wb + FS / 100, TOT = bad === 2 ? (FS >= 100 ? tot - 1 : tot + 1) : tot;
+          const aText = bad === 0 ? `${wa}.${pad2(FA)}` : hund2(A);
+          const work = [`Write ${hund(A)} as ${aText} so the points line up.`, `Add the parts after the points: 0.${pad2(FA)} + 0.${pad2(fb)} = ${hund2(FS)}.`, `Add the whole numbers too: ${wa} + ${wb} + ${hund2(FS)} = ${hund2(Math.round(TOT * 100))}.`];
+          const fixes = [`${hund(A)} is the same as ${hund2(A)}, not ${aText}.`, `0.${pad2(FA)} + 0.${pad2(fb)} is ${hund2(fs)}, not ${hund2(FS)}.`, `${wa} + ${wb} + ${hund2(FS)} is ${hund2(Math.round(tot * 100))}.`];
+          return spotMistake(who, `${hund(A)} + ${hund2(b)}`, work, bad, fixes[bad], `Line up the points, then check each adding step.`, `${hund(A)} + ${hund2(b)} = ${hund2(A + b)}.`);
+        }
+        if (kind === 1) {
+          const a = rnd(2, 15), b = rnd(2, 9), c = rnd(2, 9), r = a + b * c;
+          if (Math.random() < 0.5) {
+            return spotMistake(who, `${a} + ${b} × ${c}`, [`Add first: ${a} + ${b} = ${a + b}.`, `Then multiply: ${a + b} × ${c} = ${(a + b) * c}.`, `So ${a} + ${b} × ${c} = ${(a + b) * c}.`], 0,
+              `Multiply before you add: ${b} × ${c} comes first.`, `Which comes first: adding or multiplying?`, `${b} × ${c} = ${b * c}, then ${a} + ${b * c} = ${r}.`);
+          }
+          return spotMistake(who, `${a} + ${b} × ${c}`, [`Multiply first: ${b} × ${c} = ${b * c}.`, `Then add: ${a} + ${b * c} = ${r + 10}.`, `So ${a} + ${b} × ${c} = ${r + 10}.`], 1,
+            `${a} + ${b * c} is ${r}, not ${r + 10}.`, `Check the adding in Step 2.`, `${a} + ${b} × ${c} = ${r}.`);
+        }
+        const h = rnd(112, 989), x = hund2(h), p = pick([10, 100]), z = p === 10 ? 1 : 2, bad = rnd(0, 2);
+        const right = hund(h * p);
+        const moves = bad === 0 || bad === 2 ? (z === 1 ? 2 : 1) : z;
+        const shown = bad === 1 ? String(Number((h / 100 / p).toFixed(6))) : hund(h * Math.pow(10, moves));
+        const work = [
+          bad === 0 ? `${p} has ${z} zero${z === 1 ? "" : "s"}, so move the point ${moves} place${moves === 1 ? "" : "s"}.` : `${p} has ${z} zero${z === 1 ? "" : "s"}, so move the point ${z} place${z === 1 ? "" : "s"}.`,
+          bad === 1 ? `Multiplying makes a number smaller, so move the point left.` : `Multiplying by ${p} makes a number bigger, so move the point right.`,
+          `Move the point: ${x} becomes ${shown}.`,
+        ];
+        const fixes = [`${p} has ${z} zero${z === 1 ? "" : "s"}, so the point moves ${z} place${z === 1 ? "" : "s"}, not ${moves}.`, `Multiplying by ${p} makes a number bigger, so the point moves right.`, `Moving the point ${z} place${z === 1 ? "" : "s"} right gives ${right}, not ${shown}.`];
+        return spotMistake(who, `${x} × ${p}`, work, bad, fixes[bad], `How many zeros does ${p} have? Which way should the point move?`, `${x} × ${p} = ${right}.`);
+      },
+      function explain5() {
+        const kind = rnd(0, 2);
+        if (kind === 0) {
+          let n = rnd(101, 999);
+          if (n % 10 === 0) n += 4;
+          const x = hund2(n), lo = (Math.floor(n / 10) / 10).toFixed(1), hi = ((Math.floor(n / 10) + 1) / 10).toFixed(1), dgt = n % 10, up = dgt >= 5;
+          const answer = `${x} rounds to ${up ? hi : lo}.`;
+          return explain(`Round ${x} to the nearest tenth.`,
+            up ? `${x} is between ${lo} and ${hi}. The hundredths digit is ${dgt}, which is 5 or more, so it rounds up to ${hi}.` : `${x} is between ${lo} and ${hi}. The hundredths digit is ${dgt}, which is less than 5, so it rounds down to ${lo}.`,
+            up ? [`Just drop the last digit, so it is ${lo}.`, `Round to the nearest whole number, so it is ${Math.round(n / 100)}.`, `The hundredths digit is ${dgt}, which is less than 5, so it rounds down to ${lo}.`]
+              : [`Always round up, so it is ${hi}.`, `Round to the nearest whole number, so it is ${Math.round(n / 100)}.`, `The hundredths digit is ${dgt}, which is 5 or more, so it rounds up to ${hi}.`],
+            `Find the two tenths ${x} is between. Then look at the hundredths digit.`, answer);
+        }
+        if (kind === 1) {
+          const t = rnd(2, 9), w = rnd(3, 5), p = t * w;
+          return explain(`0.${t} × ${w} = ${hund(p * 10)}.`, `${w} groups of ${t} tenths is ${p} tenths, and ${p} tenths is ${hund(p * 10)}.`,
+            [`${t} × ${w} = ${p}, so the answer is ${p}.`, `The point moves when you multiply, so the answer is 0.${pad2(p)}.`, `Just add: 0.${t} + ${w} = ${w}.${t}.`],
+            `Think of 0.${t} as ${t} tenths. What are ${w} groups of that?`, `0.${t} × ${w} = ${hund(p * 10)}.`);
+        }
+        const w = rnd(3, 9), t = rnd(1, w - 1);
+        return explain(`${w} − 0.${t} = ${hund(w * 100 - t * 10)}.`, `Think of ${w} as ${w - 1} and 10 tenths. Take away ${t} tenths and ${w - 1} and ${10 - t} tenths are left: ${hund(w * 100 - t * 10)}.`,
+          [`${w} − ${t} = ${w - t}, so the answer is ${w - t}.`, `Line up the ${t} under the ${w}: the answer is 0.${w - t}.`, `Put the ${t} after the point: the answer is ${w}.${t}.`],
+          `${w} is the same as ${w}.0. How many tenths can you take from it?`, `${w} − 0.${t} = ${hund(w * 100 - t * 10)}.`);
+      },
+    ],
+    6: [
+      function spotMistake6() {
+        const who = pick(NAMES), kind = rnd(0, 2);
+        if (kind === 0) {
+          const p = pick([20, 30, 40, 60, 70, 80, 90]), n = pick([40, 50, 60, 80, 120, 150, 200]), ten = n / 10, k = p / 10, bad = rnd(0, 2);
+          const T = bad === 0 ? n / 100 : ten, K = bad === 1 ? p : k, prod = bad === 2 ? K * T + T : K * T;
+          const work = [`10% of ${n} is ${dec(T)}.`, `${p}% is ${K} groups of 10%.`, `${K} × ${dec(T)} = ${dec(prod)}.`];
+          const fixes = [`10% of ${n} is ${ten}, not ${dec(T)}.`, `${p}% is ${k} groups of 10%, not ${K}.`, `${K} × ${dec(T)} is ${dec(K * T)}, not ${dec(prod)}.`];
+          return spotMistake(who, `${p}% of ${n}`, work, bad, fixes[bad], `Check each step: 10% means divide by 10.`, `${p}% of ${n} = ${dec((p * n) / 100)}.`);
+        }
+        if (kind === 1) {
+          const p = pick([10, 20, 25, 50]), P = pick([40, 60, 80, 120]), off = (P * p) / 100;
+          if (Math.random() < 0.5) {
+            return spotMistake(who, `the sale price of a jacket that costs ${money(P)}, at ${p}% off`, [`${p}% of ${money(P)} is ${money(off)}.`, `The sale takes ${money(off)} off the price.`, `${money(P)} + ${money(off)} = ${money(P + off)}.`], 2,
+              `A sale takes money off, so subtract: ${money(P)} − ${money(off)} = ${money(P - off)}.`, `Does a sale make the price go up or down?`, `The sale price is ${money(P - off)}.`);
+          }
+          return spotMistake(who, `the sale price of a jacket that costs ${money(P)}, at ${p}% off`, [`${p}% of ${money(P)} is ${money(p)}.`, `The sale takes ${money(p)} off the price.`, `${money(P)} − ${money(p)} = ${money(P - p)}.`], 0,
+            `${p}% of ${money(P)} is ${money(off)}, not ${money(p)}.`, `Is ${p}% of ${money(P)} really ${money(p)}?`, `${money(P)} − ${money(off)} = ${money(P - off)}.`);
+        }
+        const qt = rnd(2, 9), d = rnd(2, 9), D = qt * d, bad = rnd(0, 2), A = hund(D * 10), B = hund(d * 10);
+        const work = bad === 0
+          ? [`Multiply only ${B} by 10: ${A} ÷ ${d}.`, `${A} ÷ ${d} = ${hund(qt * 10)}.`, `So ${A} ÷ ${B} = ${hund(qt * 10)}.`]
+          : bad === 1
+            ? [`Multiply both by 10: ${D} ÷ ${d}.`, `${D} ÷ ${d} = ${qt + 1}.`, `So ${A} ÷ ${B} = ${qt + 1}.`]
+            : [`Multiply both by 10: ${D} ÷ ${d}.`, `${D} ÷ ${d} = ${qt}.`, `Put the point back: ${A} ÷ ${B} = ${hund(qt * 10)}.`];
+        const fixes = [`Both numbers must be multiplied by 10: ${D} ÷ ${d}.`, `${D} ÷ ${d} is ${qt}, not ${qt + 1}.`, `${D} ÷ ${d} already has the same answer as ${A} ÷ ${B}, so the answer is ${qt}.`];
+        return spotMistake(who, `${A} ÷ ${B}`, work, bad, fixes[bad], `Multiplying both numbers by 10 keeps the answer the same.`, `${A} ÷ ${B} = ${qt}.`);
+      },
+      function explain6() {
+        const kind = rnd(0, 2);
+        if (kind === 0) {
+          const [a, b] = shuffle([10, 20, 30, 40, 50, 60, 80]).slice(0, 2).sort((x, y) => x - y), v = (a * b) / 100;
+          return explain(`Which is more: ${a}% of ${b} or ${b}% of ${a}?`, `They are equal. ${a}% of ${b} is ${v}, and ${b}% of ${a} is also ${v}.`,
+            [`${a}% of ${b} is more, because ${b} is a bigger number.`, `${b}% of ${a} is more, because ${b}% is a bigger percent.`, `You can't compare percents of different numbers.`],
+            `Work out both: ${a}% of ${b} = ${a / 100} × ${b}, and ${b}% of ${a} = ${b / 100} × ${a}.`, `Both are ${v}.`);
+        }
+        if (kind === 1) {
+          const [d, k, name] = pick([["0.5", 2, "halves"], ["0.25", 4, "quarters"], ["0.2", 5, "fifths"], ["0.1", 10, "tenths"]]), w = rnd(2, 9);
+          return explain(`What is ${w} ÷ ${d}?`, `There are ${k} ${name} in every whole, so ${w} wholes have ${w * k} ${name}. The answer is ${w * k}.`,
+            [`Dividing makes numbers smaller, so it is ${w} × ${d} = ${dec(w * Number(d))}.`, `Ignore the point: ${w} ÷ ${d.replace("0.", "")} = ${dec(w / Number(d.replace("0.", "")))}.`, `Take ${d} away from ${w}: ${dec(w - Number(d))}.`],
+            `How many ${d}s fit into 1 whole? Into ${w} wholes?`, `${w} ÷ ${d} = ${w * k}.`);
+        }
+        const p = pick([10, 20, 25]), P = pick([40, 60, 80, 120]), off = (P * p) / 100;
+        return explain(`A board game costs ${money(P)}. It is ${p}% off. What is the sale price?`, `${p}% of ${money(P)} is ${money(off)}, so the sale price is ${money(P)} − ${money(off)} = ${money(P - off)}.`,
+          [`${p}% off means take away $${p}: ${money(P)} − ${money(p)} = ${money(P - p)}.`, `${p}% of ${money(P)} is ${money(off)}, so the sale price is ${money(P)} + ${money(off)} = ${money(P + off)}.`, `${p}% off means the new price is ${money(off)}.`],
+          `First find how much you save. Then decide: add it or take it away?`, `The sale price is ${money(P - off)}.`);
+      },
+    ],
+  };
+
+  // Add the new kinds of problems to each grade. New decimal, percent and reasoning problems are
+  // marked so every round in grades 4-6 is sure to include some of them.
+  for (const g of [4, 5, 6]) {
+    for (const f of NEW_MATH[g]) { f.focus = "new"; MATH[g].push(f); }
+    for (const f of REASONING[g]) { f.focus = "reasoning"; MATH[g].push(f); }
+  }
+
+  // ---------- the six components of numeracy ----------
+  // Each kind of math problem is tagged with the main component it builds, following the Six
+  // Components of Numeracy in the Illinois Comprehensive Numeracy Plan (ISBE, 2026).
+  // "disposition" (sticking with it) isn't a kind of problem: the report reads it from effort.
+  const COMPONENTS = {
+    conceptual: { name: "Understanding the ideas", plain: "knowing what numbers and operations mean, like why 0.5 is the same as 0.50" },
+    fluency: { name: "Accurate, flexible steps", plain: "carrying out the steps of a problem correctly" },
+    strategic: { name: "Solving problems", plain: "figuring out what a word problem asks and how to solve it" },
+    reasoning: { name: "Checking and reasoning", plain: "checking work and spotting mistakes" },
+    discourse: { name: "Explaining math thinking", plain: "telling a good math explanation from a wrong one" },
+    disposition: { name: "Sticking with it", plain: "keeping going when a problem is tricky" },
+  };
+  const COMPONENT_OF = {
+    // grade 1
+    "Adding within 20": "fluency", "Subtracting within 20": "fluency", "Finding the missing number": "strategic", "Tens and ones": "conceptual", "Comparing numbers": "conceptual", "Adding to make 10": "fluency",
+    // grade 2
+    "Adding two-digit numbers": "fluency", "Subtracting with borrowing": "fluency", "Place value to 1,000": "conceptual", "Counting money": "strategic", "Skip counting": "fluency",
+    // grade 3
+    "Multiplication as equal groups": "conceptual", "What multiplication means": "conceptual", "Division facts": "fluency", "Rounding to the nearest hundred": "conceptual", "Area of a rectangle": "strategic", "Perimeter": "strategic",
+    // grade 4
+    "Multiplying multi-digit numbers": "fluency", "Equivalent fractions": "conceptual", "Adding fractions with like denominators": "fluency", "Comparing fractions with unlike denominators": "conceptual", "Division with remainders": "fluency",
+    "Tenths and hundredths": "conceptual", "Comparing decimals": "conceptual", "Decimal grid model": "conceptual",
+    // grade 5
+    "Adding decimals": "fluency", "Fraction of a whole number": "fluency", "Volume of a rectangular box": "strategic", "Order of operations": "fluency", "Multiplying decimals by 10 and 100": "conceptual", "Adding fractions with unlike denominators": "fluency",
+    "Decimal place value": "conceptual", "Rounding decimals": "conceptual", "Subtracting decimals": "fluency", "Multiplying a decimal by a whole number": "fluency", "Decimal word problems with money": "strategic",
+    // grade 6
+    "Equivalent ratios": "strategic", "Percent of a number": "fluency", "Unit rate": "strategic", "Adding negative numbers": "conceptual", "One-step equations": "fluency",
+    "Percents, fractions and decimals": "conceptual", "Finding the whole from a percent": "strategic", "Sale prices and tips": "strategic", "Dividing decimals": "fluency",
+    // every grade with them
+    "Spot the mistake": "reasoning", "Which explanation is right?": "discourse",
+  };
+  // The app copies only some fields of each question, so look the tag up by skill name.
+  const componentOf = (question, subject) => (subject === "math" ? question.component || COMPONENT_OF[question.skill] || "fluency" : undefined);
+
+  // The 10 × 10 grid picture and the step-by-step "read this first" box. The app draws a fraction
+  // picture as one row of cells; with 100 cells, lay them out as a square instead.
+  (function gridCss() {
+    try {
+      const st = document.createElement("style");
+      st.id = "nn-bank-css";
+      st.textContent = `
+        [class*="_bar_"]:has(> :nth-child(100)){display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:2px;height:auto;width:100%;max-width:15rem;margin:0 auto}
+        [class*="_bar_"]:has(> :nth-child(100)) > *{min-width:0;aspect-ratio:1;border-radius:3px}
+        [class*="_card_"]:has(> [class*="_bar_"] > :nth-child(100)){flex:1 1 100%}
+        [class*="_passage_"] p{white-space:pre-line}`;
+      (document.head || document.documentElement).appendChild(st);
+    } catch (e) { /* not in a browser */ }
+  })();
+
   const MATH_TOPICS = {
     1: "Adding, subtracting and place value",
     2: "Two-digit math, place value and money",
     3: "Multiplication, division, rounding and area",
-    4: "Fractions, multiplication and division",
-    5: "Decimals, fractions, volume and order of operations",
-    6: "Ratios, percents, integers and equations",
+    4: "Fractions, tenths and hundredths, multiplication and division",
+    5: "Decimals to hundredths, fractions, volume and order of operations",
+    6: "Ratios, percents, decimals, integers and equations",
   };
 
   // ---------- reading library ----------
@@ -979,14 +1497,22 @@
         // never the same kind twice in a row. One may be swapped for a hand-written question.
         const LEN = 10;
         let items = [];
-        while (items.length < LEN) for (const g of shuffle(MATH[grade])) if (items.length < LEN) items.push(g());
+        // Grades 4-6: up to 4 of the new decimal and percent kinds and 1 reasoning or explaining
+        // question first, then the rest of the kinds, each once, before any kind repeats.
+        const gens = MATH[grade];
+        const first = shuffle(gens.filter((g) => g.focus === "new")).slice(0, 4).concat(shuffle(gens.filter((g) => g.focus === "reasoning")).slice(0, 1));
+        const order = first.concat(shuffle(gens.filter((g) => !first.includes(g))));
+        while (items.length < LEN) for (const g of items.length ? shuffle(gens) : order) if (items.length < LEN) items.push(g());
         const ok = (list) => list.every((x, i) => i === 0 || x.skill !== list[i - 1].skill);
         questions = items;
         for (let tries = 0; tries < 200 && !ok(questions); tries++) questions = shuffle(items);
         const fresh = deck.questions.filter((x) => !seenList.includes(x.id));
         const base = pick(fresh.length ? fresh : deck.questions);
         const slot = questions.findIndex((x) => x.skill === base.skill);
-        questions[slot >= 0 ? slot : rnd(0, LEN - 1)] = base;
+        // With no matching kind, swap out an older kind so the new kinds stay in the round.
+        const skillOf = (g) => g.skillName || (g.skillName = g().skill);
+        const older = questions.map((x, i) => (MATH[grade].some((g) => !g.focus && skillOf(g) === x.skill) ? i : -1)).filter((i) => i >= 0);
+        questions[slot >= 0 ? slot : older.length ? pick(older) : rnd(0, LEN - 1)] = base;
         seen[key] = fresh.length ? seenList.concat([base.id]) : [base.id];
       } else {
         // Reading: whole passages the student hasn't seen yet, then fall back to the oldest.
@@ -1037,6 +1563,7 @@
     round.items.push({
       index: info.index,
       skill: question.skill,
+      component: componentOf(question, info.subject),
       prompt: question.prompt,
       answer: question.choices[question.answerIndex],
       wrong: info.wrong || [],
@@ -1103,6 +1630,11 @@
       .nn-next-text{color:#5b5687;font-size:16px;margin:6px 0 0}
       .nn-next .nn-btns{margin-top:12px}
       .nn-btn.go{background:#1f8a4c}.nn-btn.redo{background:#b86e00}
+      .nn-grow{border-radius:20px;padding:14px 16px;margin:0 0 14px;background:#eef6ff}
+      .nn-grow-title{font-size:19px;font-weight:800;margin:0;line-height:1.3}
+      .nn-grow-text{color:#5b5687;font-size:16px;margin:6px 0 0}
+      .nn-chip.none{background:#f1effa;color:#5b5687}
+      .nn-ideas{margin:8px 0 0;padding-left:20px;line-height:1.5;display:grid;gap:8px}
       @media (max-width:480px){.nn-tiles{grid-template-columns:1fr}.nn-card{padding:22px 16px}}
       @media (prefers-reduced-motion:no-preference){.nn-pop{animation:nnpop .5s ease-out both}@keyframes nnpop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}}
     `;
@@ -1115,16 +1647,21 @@
     const items = round.items.slice().sort((a, b) => a.index - b.index);
     const count = (r) => items.filter((x) => x.result === r).length;
     const skills = {};
+    const components = {};
     for (const it of items) {
       const s = (skills[it.skill] = skills[it.skill] || { skill: it.skill, total: 0, first: 0, helped: 0, shown: 0 });
       s.total++; s[it.result]++;
+      if (it.component) {
+        const c = (components[it.component] = components[it.component] || { component: it.component, total: 0, first: 0, helped: 0, shown: 0 });
+        c.total++; c[it.result]++;
+      }
     }
     return {
       when: new Date().toISOString(),
       subject: round.subject, grade: round.grade,
       minutes: Math.max(1, Math.round((Date.now() - round.startedAt) / 60000)),
       total: items.length, first: count("first"), helped: count("helped"), shown: count("shown"),
-      skills: Object.values(skills), items,
+      skills: Object.values(skills), components: Object.values(components), items,
     };
   }
 
@@ -1176,6 +1713,20 @@
     }
     return { kind: "keep", title: "You're getting stronger! 🌱", text: "Keep practicing and you'll be ready for the next level soon." };
   }
+  // Productive disposition: praise effort and treat mistakes as part of learning.
+  function growMessage(s) {
+    const tricky = s.helped + s.shown;
+    if (tricky > 0) {
+      return {
+        title: pick(["Mistakes help your brain grow! 🌱", "Tricky problems make your brain stronger! 💪", "You kept going when it got hard! ⭐"]),
+        text: `You stuck with ${tricky} tricky question${tricky === 1 ? "" : "s"}. Every mistake is a clue that helps you learn.`,
+      };
+    }
+    return {
+      title: pick(["Your hard work is paying off! 🌟", "You worked so carefully! 🌟"]),
+      text: "Keep challenging yourself. Hard problems help your brain grow.",
+    };
+  }
   function goHome() { window.location.href = new URL("./", window.location.href).href; }
 
   // The child's "You did it!" screen.
@@ -1183,11 +1734,13 @@
     const s = summarize();
     if (!s.total) return newRound();
     if (skipSave !== true) saveRound({ when: s.when, subject: s.subject, grade: s.grade, total: s.total, first: s.first, helped: s.helped, shown: s.shown, minutes: s.minutes,
-      skills: s.skills.map((k) => ({ skill: k.skill, total: k.total, right: k.first + k.helped, first: k.first })) });
+      skills: s.skills.map((k) => ({ skill: k.skill, total: k.total, right: k.first + k.helped, first: k.first })),
+      components: (s.components || []).map((c) => ({ component: c.component, total: c.total, right: c.first + c.helped, first: c.first })) });
     const right = s.first + s.helped;
     const stars = right >= s.total * 0.9 ? 3 : right >= s.total * 0.6 ? 2 : 1;
     const cheer = stars === 3 ? "Amazing work!" : stars === 2 ? "Great job!" : "You finished! Way to keep going!";
     const next = suggestion(s);
+    const grow = growMessage(s);
     const el = overlay(`
       <div class="nn-card nn-center nn-pop">
         ${OWL}
@@ -1199,6 +1752,10 @@
           <div class="nn-tile first"><b>${s.first}</b><span>First try</span></div>
           <div class="nn-tile helped"><b>${s.helped}</b><span>With a hint</span></div>
           <div class="nn-tile shown"><b>${s.shown}</b><span>Learned the steps</span></div>
+        </div>
+        <div class="nn-grow" data-grow>
+          <p class="nn-grow-title">${grow.title}</p>
+          <p class="nn-grow-text">${esc(grow.text)}</p>
         </div>
         <div class="nn-next ${next.kind}" data-next="${next.kind}">
           <p class="nn-next-title">${next.title}</p>
@@ -1245,6 +1802,79 @@
     el.querySelector('[data-act="back"]').onclick = () => finish(true);
   }
 
+  // Short things to do together at home, matched to the part of numeracy that needs the most practice.
+  const FAMILY_IDEAS = {
+    conceptual: [
+      "Coins as decimals: lay out a few dimes and pennies and ask, \u201cWhat part of a dollar is this?\u201d Write it together, like $0.34.",
+      "Fold and share: fold paper or cut a sandwich into equal parts and name the pieces (\u201ceach piece is one fourth\u201d).",
+      "Compare at the store: which is heavier, 2.5 pounds or 2.45 pounds? Talk about why more digits doesn't mean bigger.",
+    ],
+    fluency: [
+      "Card flip: turn over two playing cards and race to add or multiply them.",
+      "Car-ride counting: count by 2s, 5s, 25s or tenths (0.1, 0.2, 0.3...) together, forward and back.",
+      "Dice race: roll two dice and multiply. First to 100 points wins.",
+    ],
+    strategic: [
+      "Recipe math: double or halve a recipe together and work out the new amounts.",
+      "Pretend shopping: with a $10 budget and a few prices, can you buy three things? How much change is left?",
+      "Make up a story problem about your day for each other to solve.",
+    ],
+    reasoning: [
+      "Spot my mistake: add up a short receipt and make one small mistake on purpose. Can your child find it?",
+      "Estimate first: guess the total of a few grocery prices, then add them up. Was the guess close?",
+      "Always, sometimes or never? \u201cIs a number with more digits always bigger?\u201d Test it together with examples.",
+    ],
+    discourse: [
+      "Ask \u201cHow did you figure that out?\u201d after any answer, right or wrong, and listen to the whole explanation.",
+      "Two ways: solve one problem two different ways and talk about which way you like better.",
+      "Teach-back: have your child teach you a math game or trick from this round.",
+    ],
+    disposition: [
+      "Share a time you made a mistake and what you learned from it.",
+      "Praise the effort: \u201cYou kept trying on that one!\u201d helps more than \u201cYou're so smart.\u201d",
+      "Play a number game where everyone loses sometimes, and laugh about it together.",
+    ],
+  };
+
+  // How the round went by the six components, in plain words (math rounds only).
+  function numeracySection(s) {
+    const comps = s.components || [];
+    if (s.subject !== "math" || !comps.length) return "";
+    const byKey = {};
+    for (const c of comps) byKey[c.component] = c;
+    const level = (k) => (k.shown === 0 && k.helped === 0 ? ["strong", "Strong"] : k.shown === 0 ? ["close", "Getting there"] : ["practice", "Needs practice"]);
+    const tricky = s.helped + s.shown;
+    const rows = Object.keys(COMPONENTS).map((key) => {
+      const info = COMPONENTS[key];
+      if (key === "disposition") {
+        const meta = tricky
+          ? `Finished the round and kept trying on ${tricky} question${tricky === 1 ? "" : "s"} that ${tricky === 1 ? "was" : "were"} tricky at first.`
+          : "Finished the round with no tricky moments. Harder problems will give more chances to practice this.";
+        return `<li class="nn-row" data-component="${key}"><div class="top"><span class="q">${info.name}</span><span class="nn-chip strong">Kept going</span></div><div class="meta">${esc(info.plain[0].toUpperCase() + info.plain.slice(1))}. ${esc(meta)}</div></li>`;
+      }
+      const c = byKey[key];
+      if (!c) return `<li class="nn-row" data-component="${key}"><div class="top"><span class="q">${info.name}</span><span class="nn-chip none">Not in this round</span></div><div class="meta">${esc(info.plain[0].toUpperCase() + info.plain.slice(1))}.</div></li>`;
+      const [cls, label] = level(c);
+      return `<li class="nn-row" data-component="${key}"><div class="top"><span class="q">${info.name}</span><span class="nn-chip ${cls}">${label}</span></div><div class="meta">${esc(info.plain[0].toUpperCase() + info.plain.slice(1))}. ${c.first + c.helped} of ${c.total} right${c.first ? `, ${c.first} on the first try` : ""}.</div></li>`;
+    }).join("");
+    // The weakest component: the most full solutions needed, then the fewest first tries.
+    const score = (c) => (c.first + 0.5 * c.helped) / c.total;
+    const weakest = comps.slice().sort((a, b) => score(a) - score(b))[0];
+    const weak = weakest && score(weakest) < 1 ? weakest.component : null;
+    const ideas = FAMILY_IDEAS[weak || "discourse"].slice(0, 3);
+    const heading = weak ? `Family math ideas for \u201c${COMPONENTS[weak].name}\u201d` : "Family math ideas to keep it fun";
+    return `
+        <h2 class="nn-h2">By part of numeracy</h2>
+        <p class="nn-small" style="margin:0 0 8px">Being good at math has six connected parts. Here's how this round went for each one.</p>
+        <ul class="nn-list" data-numeracy>${rows}</ul>
+        <h2 class="nn-h2">${heading}</h2>
+        <div class="nn-note" data-family-ideas="${weak || "general"}">
+          ${weak ? `<p style="margin:0">This round, <b>${esc(COMPONENTS[weak].name.toLowerCase())}</b> (${esc(COMPONENTS[weak].plain)}) needed the most help. A few minutes of math together can help:</p>` : `<p style="margin:0">Every part went well this round. Keep math part of everyday life:</p>`}
+          <ul class="nn-ideas">${ideas.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+        </div>
+        <p class="nn-small" style="margin-top:8px">Inspired by the Illinois Comprehensive Numeracy Plan (ISBE, 2026). NumberNest is not affiliated with or endorsed by ISBE.</p>`;
+  }
+
   // The grown-up report for this round.
   function report(s) {
     const when = new Date(s.when).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -1272,6 +1902,7 @@
         <div class="nn-note">${note}</div>
         <h2 class="nn-h2">By skill</h2>
         <ul class="nn-list">${s.skills.map((k) => { const [c, t] = level(k); return `<li class="nn-row"><div class="top"><span class="q">${esc(k.skill)}</span><span class="nn-chip ${c}">${t}</span></div><div class="meta">${k.first + k.helped} of ${k.total} right${k.first ? `, ${k.first} on the first try` : ""}</div></li>`; }).join("")}</ul>
+        ${numeracySection(s)}
         <h2 class="nn-h2">Every question</h2>
         <ul class="nn-list">${s.items.map((it, i) => `<li class="nn-row"><div class="top"><span class="q">${i + 1}. ${esc(it.prompt)}</span><span class="nn-chip ${it.result}">${RESULT_LABEL[it.result]}</span></div>
           <div class="meta">${esc(it.skill)} · Answer: <b>${esc(it.answer)}</b>${it.wrong.length ? ` · First tried: ${esc(it.wrong.join(", "))}` : ""}${it.hints ? ` · ${it.hints} hint${it.hints === 1 ? "" : "s"}` : ""}</div></li>`).join("")}</ul>

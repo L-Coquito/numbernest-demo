@@ -10,8 +10,13 @@ Open `index.html`, or visit the GitHub Pages link for this repository.
 ## Questions and passages
 
 `bank.js` holds the question bank. Math questions are generated with new numbers every time:
-five kinds of problems per grade (for example grade 4 has multi-digit multiplication, equivalent
-fractions, adding fractions, comparing fractions and division with remainders). Reading has eight
+five kinds of problems in grades 1–3 and ten to twelve in grades 4–6 (for example grade 4 has
+multi-digit multiplication, equivalent fractions, adding and comparing fractions, division with
+remainders, tenths and hundredths, comparing decimals and a 10 × 10 grid or coin picture).
+Decimals and percents follow the Illinois Learning Standards: tenths and hundredths in grade 4,
+decimal place value, rounding and operations in grade 5, and percents and dividing decimals in grade 6.
+Grades 4–6 also have **spot the mistake** questions (find the first wrong step in someone's work) and
+**which explanation is right?** questions, and every round includes some of the new kinds. Reading has eight
 new original passages per grade with two questions each, plus the original passages, and rotates
 so the passages read longest ago come back last.
 
@@ -29,6 +34,12 @@ After the last question, **See my results** opens a completed screen for the chi
 score, and how many were right on the first try, right after a hint, or needed the full solution.
 **Show a grown-up** asks a quick grown-ups question, then opens a report with results by skill,
 every question with the answer and what was tried first, what to practice next, and earlier rounds.
+The completed screen also cheers effort ("Mistakes help your brain grow!"), and for math the report
+shows how the round went for each of the six components of numeracy (understanding the ideas,
+accurate steps, solving problems, checking and reasoning, explaining math thinking, and sticking
+with it) with two or three family math ideas for the part that needed the most help. This part is
+inspired by the Illinois Comprehensive Numeracy Plan (ISBE, 2026); NumberNest is not affiliated with
+or endorsed by ISBE.
 Results are kept in the browser on that device only and are never sent anywhere.
 
 Everything in the demo is invented placeholder content — no real student data, no network calls,
